@@ -387,6 +387,49 @@ const yaml_1 = __nccwpck_require__(7538);
 const zod_1 = __nccwpck_require__(7151);
 const errors_1 = __nccwpck_require__(1361);
 const githubLogin_1 = __nccwpck_require__(3344);
+const defaultRawTemplates = {
+    registry: {
+        commit_message: 'chore: record CLA signature for {{github_login}}',
+    },
+    pr: {
+        missing_comment: [
+            'This pull request requires CLA signatures before it can be merged.',
+            '',
+            'Missing signatures:',
+            '',
+            '{{missing_contributors_markdown}}',
+            '',
+            'To sign the CLA, each missing contributor must comment exactly:',
+            '',
+            '`{{signing_comment_pattern}}`',
+            '',
+            'CLA document:',
+            '<{{cla_document_url}}>',
+        ].join('\n'),
+        success_comment: 'CLA requirements are satisfied for this pull request.',
+    },
+    check: {
+        success_title: 'CLA satisfied',
+        success_summary: [
+            'All required contributors have signed {{cla_version}}.',
+            '',
+            'Contributors checked:',
+            '',
+            '{{contributors_markdown}}',
+        ].join('\n'),
+        failure_title: 'CLA signatures required',
+        failure_summary: [
+            'The following contributors still need to sign {{cla_version}}:',
+            '',
+            '{{missing_contributors_markdown}}',
+            '',
+            'Required comment: `{{signing_comment_pattern}}`',
+            'Document: <{{cla_document_url}}>',
+        ].join('\n'),
+        disabled_title: 'CLA disabled',
+        disabled_summary: 'CLA enforcement is disabled for this repository.',
+    },
+};
 const rawConfigSchema = zod_1.z.object({
     enabled: zod_1.z.boolean().default(true),
     document: zod_1.z.object({
@@ -426,18 +469,44 @@ const rawConfigSchema = zod_1.z.object({
         type: zod_1.z.enum(['issue', 'json-repo']),
         repository: zod_1.z.string().regex(/^[^/]+\/[^/]+$/, 'registry.repository must be owner/repo'),
         path_prefix: zod_1.z.string().min(1).default('signatures'),
-        commit_message_template: zod_1.z.string().min(1).default('chore: record CLA signature for {{github_login}}'),
     }),
     status: zod_1.z
         .object({
         check_name: zod_1.z.string().min(1).default('CLA Check'),
         comment_tag: zod_1.z.string().min(1).default('<!-- cla-bot -->'),
-        include_registry_links: zod_1.z.boolean().default(false),
     })
         .default({
         check_name: 'CLA Check',
         comment_tag: '<!-- cla-bot -->',
-        include_registry_links: false,
+    }),
+    templates: zod_1.z
+        .object({
+        registry: zod_1.z
+            .object({
+            commit_message: zod_1.z.string().min(1).default(defaultRawTemplates.registry.commit_message),
+        })
+            .default(defaultRawTemplates.registry),
+        pr: zod_1.z
+            .object({
+            missing_comment: zod_1.z.string().min(1).default(defaultRawTemplates.pr.missing_comment),
+            success_comment: zod_1.z.string().min(1).default(defaultRawTemplates.pr.success_comment),
+        })
+            .default(defaultRawTemplates.pr),
+        check: zod_1.z
+            .object({
+            success_title: zod_1.z.string().min(1).default(defaultRawTemplates.check.success_title),
+            success_summary: zod_1.z.string().min(1).default(defaultRawTemplates.check.success_summary),
+            failure_title: zod_1.z.string().min(1).default(defaultRawTemplates.check.failure_title),
+            failure_summary: zod_1.z.string().min(1).default(defaultRawTemplates.check.failure_summary),
+            disabled_title: zod_1.z.string().min(1).default(defaultRawTemplates.check.disabled_title),
+            disabled_summary: zod_1.z.string().min(1).default(defaultRawTemplates.check.disabled_summary),
+        })
+            .default(defaultRawTemplates.check),
+    })
+        .default({
+        registry: defaultRawTemplates.registry,
+        pr: defaultRawTemplates.pr,
+        check: defaultRawTemplates.check,
     }),
 });
 function parseClaConfig(raw) {
@@ -467,12 +536,27 @@ function parseClaConfig(raw) {
                 type: parsed.registry.type,
                 repository: parsed.registry.repository,
                 pathPrefix: parsed.registry.path_prefix,
-                commitMessageTemplate: parsed.registry.commit_message_template,
             },
             status: {
                 checkName: parsed.status.check_name,
                 commentTag: parsed.status.comment_tag,
-                includeRegistryLinks: parsed.status.include_registry_links,
+            },
+            templates: {
+                registry: {
+                    commitMessage: parsed.templates.registry.commit_message,
+                },
+                pr: {
+                    missingComment: parsed.templates.pr.missing_comment,
+                    successComment: parsed.templates.pr.success_comment,
+                },
+                check: {
+                    successTitle: parsed.templates.check.success_title,
+                    successSummary: parsed.templates.check.success_summary,
+                    failureTitle: parsed.templates.check.failure_title,
+                    failureSummary: parsed.templates.check.failure_summary,
+                    disabledTitle: parsed.templates.check.disabled_title,
+                    disabledSummary: parsed.templates.check.disabled_summary,
+                },
             },
         };
     }
@@ -810,37 +894,17 @@ function createGitHubClient(token) {
 /***/ }),
 
 /***/ 9645:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GitHubStatusReporter = void 0;
+const template_1 = __nccwpck_require__(8460);
 function formatContributors(contributors) {
     return contributors.map(contributor => `- @${contributor.githubLogin}`).join('\n');
 }
-function buildFailureComment(config, evaluation) {
-    return [
-        config.status.commentTag,
-        '',
-        'This pull request requires CLA signatures before it can be merged.',
-        '',
-        'Missing signatures:',
-        '',
-        formatContributors(evaluation.missing),
-        '',
-        'To sign the CLA, each missing contributor must comment exactly:',
-        '',
-        `\`${config.signing.commentPattern}\``,
-        '',
-        'CLA document:',
-        `<${evaluation.cla.url}>`,
-    ].join('\n');
-}
-function buildRegistryLinks(config, evaluation) {
-    if (!config.status.includeRegistryLinks) {
-        return [];
-    }
+function buildRegistryLinks(evaluation) {
     const seen = new Set();
     return evaluation.results.flatMap(result => {
         const url = result.signature?.registryUrl;
@@ -851,40 +915,41 @@ function buildRegistryLinks(config, evaluation) {
         return [`- @${result.contributor.githubLogin}: <${url}>`];
     });
 }
+function buildTemplateValues(config, evaluation) {
+    const registryLinks = buildRegistryLinks(evaluation);
+    return {
+        cla_version: evaluation.cla.version,
+        cla_document_url: evaluation.cla.url,
+        cla_document_sha256: evaluation.cla.sha256 ?? '',
+        signing_comment_pattern: config.signing.commentPattern,
+        contributors_markdown: evaluation.contributors.length === 0 ? '- none' : formatContributors(evaluation.contributors),
+        missing_contributors_markdown: evaluation.missing.length === 0 ? '- none' : formatContributors(evaluation.missing),
+        registry_links_markdown: registryLinks.join('\n'),
+        contributors_count: String(evaluation.contributors.length),
+        missing_count: String(evaluation.missing.length),
+        registry_link_count: String(registryLinks.length),
+    };
+}
+function buildPrComment(config, template, evaluation) {
+    return [config.status.commentTag, '', (0, template_1.renderTemplate)(template, buildTemplateValues(config, evaluation))].join('\n');
+}
+function buildFailureComment(config, evaluation) {
+    return buildPrComment(config, config.templates.pr.missingComment, evaluation);
+}
 function buildSuccessComment(config, evaluation) {
-    const registryLinks = buildRegistryLinks(config, evaluation);
-    return [
-        config.status.commentTag,
-        '',
-        'CLA requirements are satisfied for this pull request.',
-        ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
-    ].join('\n');
+    return buildPrComment(config, config.templates.pr.successComment, evaluation);
 }
 function buildSummary(config, evaluation) {
+    const values = buildTemplateValues(config, evaluation);
     if (evaluation.missing.length === 0) {
-        const registryLinks = buildRegistryLinks(config, evaluation);
         return {
-            title: 'CLA satisfied',
-            summary: [
-                `All required contributors have signed ${evaluation.cla.version}.`,
-                '',
-                'Contributors checked:',
-                '',
-                evaluation.contributors.length === 0 ? '- none' : formatContributors(evaluation.contributors),
-                ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
-            ].join('\n'),
+            title: (0, template_1.renderTemplate)(config.templates.check.successTitle, values),
+            summary: (0, template_1.renderTemplate)(config.templates.check.successSummary, values),
         };
     }
     return {
-        title: 'CLA signatures required',
-        summary: [
-            `The following contributors still need to sign ${evaluation.cla.version}:`,
-            '',
-            formatContributors(evaluation.missing),
-            '',
-            `Required comment: \`${config.signing.commentPattern}\``,
-            `Document: <${evaluation.cla.url}>`,
-        ].join('\n'),
+        title: (0, template_1.renderTemplate)(config.templates.check.failureTitle, values),
+        summary: (0, template_1.renderTemplate)(config.templates.check.failureSummary, values),
     };
 }
 class GitHubStatusReporter {
@@ -912,8 +977,8 @@ class GitHubStatusReporter {
             name: input.config.status.checkName,
             headSha: input.pullRequest.headSha,
             conclusion: 'success',
-            title: 'CLA disabled',
-            summary: 'CLA enforcement is disabled for this repository.',
+            title: input.config.templates.check.disabledTitle,
+            summary: input.config.templates.check.disabledSummary,
         });
     }
     async upsertInstructionComment(input) {
@@ -1011,7 +1076,7 @@ function createRegistry(client, config) {
     if (config.registry.type === 'issue') {
         return new issueRegistry_1.IssueRegistry(client, registryRepo);
     }
-    return new jsonRepoRegistry_1.JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.registry.commitMessageTemplate);
+    return new jsonRepoRegistry_1.JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.templates.registry.commitMessage);
 }
 
 
@@ -1184,12 +1249,13 @@ exports.IssueRegistry = IssueRegistry;
 /***/ }),
 
 /***/ 5023:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.JsonRepoRegistry = void 0;
+const template_1 = __nccwpck_require__(8460);
 function fromJsonSignature(login, signerType, signature, registryUrl) {
     return {
         githubLogin: login,
@@ -1218,9 +1284,6 @@ function toJsonSignature(record) {
 }
 function stringify(file) {
     return `${JSON.stringify(file, null, 2)}\n`;
-}
-function renderTemplate(template, values) {
-    return template.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (match, key) => key in values ? (values[key] ?? match) : match);
 }
 class JsonRepoRegistry {
     client;
@@ -1296,7 +1359,7 @@ class JsonRepoRegistry {
         return `${this.pathPrefix}/${signerType}/${login}.json`;
     }
     commitMessageFor(record, path) {
-        return renderTemplate(this.commitMessageTemplate, {
+        return (0, template_1.renderTemplate)(this.commitMessageTemplate, {
             github_login: record.githubLogin,
             signer_type: record.signerType,
             cla_version: record.claVersion,
@@ -1341,6 +1404,20 @@ function parseRepository(fullName) {
         throw new errors_1.ConfigurationError(`Invalid repository reference: ${fullName}`);
     }
     return { owner, repo };
+}
+
+
+/***/ }),
+
+/***/ 8460:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.renderTemplate = renderTemplate;
+function renderTemplate(template, values) {
+    return template.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (match, key) => key in values ? (values[key] ?? match) : match);
 }
 
 

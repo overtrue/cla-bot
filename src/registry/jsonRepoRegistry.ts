@@ -1,5 +1,6 @@
 import type { RepoCoordinates, SignatureRecord, SignerType } from '../core/types';
 import type { GitHubClient } from '../github/client';
+import { renderTemplate } from '../utils/template';
 import type { SignatureRegistry } from './signatureRegistry';
 
 type JsonSignature = {
@@ -21,8 +22,6 @@ type SignatureFile = {
 type LoadedSignatureFile = SignatureFile & {
   registryUrl?: string;
 };
-
-type CommitTemplateValues = Record<string, string>;
 
 function fromJsonSignature(
   login: string,
@@ -59,12 +58,6 @@ function toJsonSignature(record: SignatureRecord): JsonSignature {
 
 function stringify(file: SignatureFile): string {
   return `${JSON.stringify(file, null, 2)}\n`;
-}
-
-function renderTemplate(template: string, values: CommitTemplateValues): string {
-  return template.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (match, key: string) =>
-    key in values ? (values[key] ?? match) : match,
-  );
 }
 
 export class JsonRepoRegistry implements SignatureRegistry {

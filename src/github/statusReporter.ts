@@ -1,34 +1,12 @@
 import type { ClaConfig, ClaEvaluation, Contributor, PullRequestSnapshot } from '../core/types';
 import type { GitHubClient } from './client';
+import { renderTemplate } from '../utils/template';
 
 function formatContributors(contributors: Contributor[]): string {
   return contributors.map(contributor => `- @${contributor.githubLogin}`).join('\n');
 }
 
-function buildFailureComment(config: ClaConfig, evaluation: ClaEvaluation): string {
-  return [
-    config.status.commentTag,
-    '',
-    'This pull request requires CLA signatures before it can be merged.',
-    '',
-    'Missing signatures:',
-    '',
-    formatContributors(evaluation.missing),
-    '',
-    'To sign the CLA, each missing contributor must comment exactly:',
-    '',
-    `\`${config.signing.commentPattern}\``,
-    '',
-    'CLA document:',
-    `<${evaluation.cla.url}>`,
-  ].join('\n');
-}
-
-function buildRegistryLinks(config: ClaConfig, evaluation: ClaEvaluation): string[] {
-  if (!config.status.includeRegistryLinks) {
-    return [];
-  }
-
+function buildRegistryLinks(evaluation: ClaEvaluation): string[] {
   const seen = new Set<string>();
 
   return evaluation.results.flatMap(result => {
@@ -43,44 +21,48 @@ function buildRegistryLinks(config: ClaConfig, evaluation: ClaEvaluation): strin
   });
 }
 
-function buildSuccessComment(config: ClaConfig, evaluation: ClaEvaluation): string {
-  const registryLinks = buildRegistryLinks(config, evaluation);
+function buildTemplateValues(config: ClaConfig, evaluation: ClaEvaluation): Record<string, string> {
+  const registryLinks = buildRegistryLinks(evaluation);
 
-  return [
-    config.status.commentTag,
-    '',
-    'CLA requirements are satisfied for this pull request.',
-    ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
-  ].join('\n');
+  return {
+    cla_version: evaluation.cla.version,
+    cla_document_url: evaluation.cla.url,
+    cla_document_sha256: evaluation.cla.sha256 ?? '',
+    signing_comment_pattern: config.signing.commentPattern,
+    contributors_markdown: evaluation.contributors.length === 0 ? '- none' : formatContributors(evaluation.contributors),
+    missing_contributors_markdown: evaluation.missing.length === 0 ? '- none' : formatContributors(evaluation.missing),
+    registry_links_markdown: registryLinks.join('\n'),
+    contributors_count: String(evaluation.contributors.length),
+    missing_count: String(evaluation.missing.length),
+    registry_link_count: String(registryLinks.length),
+  };
+}
+
+function buildPrComment(config: ClaConfig, template: string, evaluation: ClaEvaluation): string {
+  return [config.status.commentTag, '', renderTemplate(template, buildTemplateValues(config, evaluation))].join('\n');
+}
+
+function buildFailureComment(config: ClaConfig, evaluation: ClaEvaluation): string {
+  return buildPrComment(config, config.templates.pr.missingComment, evaluation);
+}
+
+function buildSuccessComment(config: ClaConfig, evaluation: ClaEvaluation): string {
+  return buildPrComment(config, config.templates.pr.successComment, evaluation);
 }
 
 function buildSummary(config: ClaConfig, evaluation: ClaEvaluation): { title: string; summary: string } {
-  if (evaluation.missing.length === 0) {
-    const registryLinks = buildRegistryLinks(config, evaluation);
+  const values = buildTemplateValues(config, evaluation);
 
+  if (evaluation.missing.length === 0) {
     return {
-      title: 'CLA satisfied',
-      summary: [
-        `All required contributors have signed ${evaluation.cla.version}.`,
-        '',
-        'Contributors checked:',
-        '',
-        evaluation.contributors.length === 0 ? '- none' : formatContributors(evaluation.contributors),
-        ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
-      ].join('\n'),
+      title: renderTemplate(config.templates.check.successTitle, values),
+      summary: renderTemplate(config.templates.check.successSummary, values),
     };
   }
 
   return {
-    title: 'CLA signatures required',
-    summary: [
-      `The following contributors still need to sign ${evaluation.cla.version}:`,
-      '',
-      formatContributors(evaluation.missing),
-      '',
-      `Required comment: \`${config.signing.commentPattern}\``,
-      `Document: <${evaluation.cla.url}>`,
-    ].join('\n'),
+    title: renderTemplate(config.templates.check.failureTitle, values),
+    summary: renderTemplate(config.templates.check.failureSummary, values),
   };
 }
 
@@ -114,8 +96,8 @@ export class GitHubStatusReporter {
       name: input.config.status.checkName,
       headSha: input.pullRequest.headSha,
       conclusion: 'success',
-      title: 'CLA disabled',
-      summary: 'CLA enforcement is disabled for this repository.',
+      title: input.config.templates.check.disabledTitle,
+      summary: input.config.templates.check.disabledSummary,
     });
   }
 

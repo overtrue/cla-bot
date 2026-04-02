@@ -12,5 +12,5 @@ export function createRegistry(client: GitHubClient, config: ClaConfig): Signatu
     return new IssueRegistry(client, registryRepo);
   }
 
-  return new JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.registry.commitMessageTemplate);
+  return new JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.templates.registry.commitMessage);
 }

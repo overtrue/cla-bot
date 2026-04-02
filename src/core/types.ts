@@ -56,12 +56,27 @@ export type ClaConfig = {
     type: RegistryType;
     repository: string;
     pathPrefix: string;
-    commitMessageTemplate: string;
   };
   status: {
     checkName: string;
     commentTag: string;
-    includeRegistryLinks: boolean;
+  };
+  templates: {
+    registry: {
+      commitMessage: string;
+    };
+    pr: {
+      missingComment: string;
+      successComment: string;
+    };
+    check: {
+      successTitle: string;
+      successSummary: string;
+      failureTitle: string;
+      failureSummary: string;
+      disabledTitle: string;
+      disabledSummary: string;
+    };
   };
 };
 
