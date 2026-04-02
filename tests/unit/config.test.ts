@@ -19,7 +19,29 @@ describe('parseClaConfig', () => {
     expect(config.signing.commentPattern).toBe('I have read and agree to the CLA.');
     expect(config.contributors.checkCommitAuthors).toBe(true);
     expect(config.registry.pathPrefix).toBe('signatures');
+    expect(config.registry.commitMessageTemplate).toBe('chore: record CLA signature for {{github_login}}');
     expect(config.status.checkName).toBe('CLA Check');
+    expect(config.status.includeRegistryLinks).toBe(false);
+  });
+
+  it('parses optional registry and status fields', () => {
+    const config = parseClaConfig([
+      'document:',
+      '  version: v1',
+      '  url: https://example.com/cla/v1',
+      'registry:',
+      '  type: json-repo',
+      '  repository: overtrue/cla-registry',
+      '  commit_message_template: "chore: record {{github_login}} from {{source_repo}}#{{source_pr_number}}"',
+      'status:',
+      '  include_registry_links: true',
+      '',
+    ].join('\n'));
+
+    expect(config.registry.commitMessageTemplate).toBe(
+      'chore: record {{github_login}} from {{source_repo}}#{{source_pr_number}}',
+    );
+    expect(config.status.includeRegistryLinks).toBe(true);
   });
 
   it('fails on missing required fields', () => {

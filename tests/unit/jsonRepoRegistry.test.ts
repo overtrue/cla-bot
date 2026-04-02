@@ -20,17 +20,30 @@ const signature = {
 describe('JsonRepoRegistry', () => {
   it('creates a new JSON file for the first signature', async () => {
     const client = new MemoryGitHubClient();
-    const registry = new JsonRepoRegistry(client, repo, 'signatures');
+    const registry = new JsonRepoRegistry(
+      client,
+      repo,
+      'signatures',
+      'chore: record CLA signature for {{github_login}} from {{source_repo}}#{{source_pr_number}}',
+    );
 
-    await registry.saveSignature(signature);
+    const saved = await registry.saveSignature(signature);
 
     const file = client.getFile({ ...repo, path: 'signatures/individual/alice.json' });
+    const write = client.getFileWrites(repo).at(-1);
     expect(file?.content).toContain('"cla_version": "v1"');
+    expect(saved.registryUrl).toBe('https://github.com/overtrue/cla-registry/blob/main/signatures/individual/alice.json');
+    expect(write?.message).toBe('chore: record CLA signature for alice from app/demo#1');
   });
 
   it('is idempotent for the same version', async () => {
     const client = new MemoryGitHubClient();
-    const registry = new JsonRepoRegistry(client, repo, 'signatures');
+    const registry = new JsonRepoRegistry(
+      client,
+      repo,
+      'signatures',
+      'chore: record CLA signature for {{github_login}}',
+    );
 
     await registry.saveSignature(signature);
     await registry.saveSignature({ ...signature, signedAt: '2026-04-02T12:00:00Z', sourceCommentId: 22 });
@@ -41,7 +54,12 @@ describe('JsonRepoRegistry', () => {
 
   it('appends a new version', async () => {
     const client = new MemoryGitHubClient();
-    const registry = new JsonRepoRegistry(client, repo, 'signatures');
+    const registry = new JsonRepoRegistry(
+      client,
+      repo,
+      'signatures',
+      'chore: record CLA signature for {{github_login}}',
+    );
 
     await registry.saveSignature(signature);
     await registry.saveSignature({
@@ -57,7 +75,12 @@ describe('JsonRepoRegistry', () => {
 
   it('throws on invalid stored JSON', async () => {
     const client = new MemoryGitHubClient();
-    const registry = new JsonRepoRegistry(client, repo, 'signatures');
+    const registry = new JsonRepoRegistry(
+      client,
+      repo,
+      'signatures',
+      'chore: record CLA signature for {{github_login}}',
+    );
 
     client.seedFile({
       ...repo,

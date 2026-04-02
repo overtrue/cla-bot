@@ -5,10 +5,12 @@ export function claConfigYaml(input?: {
   repository?: string;
   registryType?: RegistryType;
   pathPrefix?: string;
+  commitMessageTemplate?: string;
   allowlist?: string[];
   caseInsensitive?: boolean;
   trimWhitespace?: boolean;
   checkCommitAuthors?: boolean;
+  includeRegistryLinks?: boolean;
 }): string {
   const allowlist = input?.allowlist ?? [];
 
@@ -40,10 +42,16 @@ export function claConfigYaml(input?: {
     ...(input?.registryType === 'json-repo' || input?.pathPrefix
       ? [`  path_prefix: ${input?.pathPrefix ?? 'signatures'}`]
       : []),
+    ...(input?.commitMessageTemplate
+      ? [`  commit_message_template: ${JSON.stringify(input.commitMessageTemplate)}`]
+      : []),
     '',
     'status:',
     '  check_name: CLA Check',
     '  comment_tag: <!-- cla-bot -->',
+    ...(input?.includeRegistryLinks !== undefined
+      ? [`  include_registry_links: ${String(input.includeRegistryLinks)}`]
+      : []),
     '',
   ].join('\n');
 }

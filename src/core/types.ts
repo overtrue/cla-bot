@@ -26,6 +26,7 @@ export type SignatureRecord = {
   sourcePrNumber: number;
   sourceCommentId?: number;
   registryType: RegistryType;
+  registryUrl?: string;
 };
 
 export type SignatureCheckResult = {
@@ -55,10 +56,12 @@ export type ClaConfig = {
     type: RegistryType;
     repository: string;
     pathPrefix: string;
+    commitMessageTemplate: string;
   };
   status: {
     checkName: string;
     commentTag: string;
+    includeRegistryLinks: boolean;
   };
 };
 
@@ -97,6 +100,7 @@ export type IssueCommentSnapshot = {
 export type RepoFile = {
   content: string;
   sha: string;
+  htmlUrl?: string;
 };
 
 export type ClaEvaluation = {

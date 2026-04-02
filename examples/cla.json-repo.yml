@@ -23,7 +23,9 @@ registry:
   type: json-repo
   repository: overtrue/cla-registry
   path_prefix: signatures
+  commit_message_template: "chore: record CLA signature for {{github_login}} from {{source_repo}}#{{source_pr_number}}"
 
 status:
   check_name: CLA Check
   comment_tag: <!-- cla-bot -->
+  include_registry_links: true

@@ -72,6 +72,7 @@ registry:
 status:
   check_name: CLA Check
   comment_tag: <!-- cla-bot -->
+  include_registry_links: false
 ```
 
 Copy-ready examples:
@@ -175,7 +176,30 @@ registry:
   type: json-repo
   repository: overtrue/cla-registry
   path_prefix: signatures
+  commit_message_template: "chore: record CLA signature for {{github_login}} from {{source_repo}}#{{source_pr_number}}"
 ```
+
+Supported placeholders for `registry.commit_message_template`:
+
+- `{{github_login}}`
+- `{{signer_type}}`
+- `{{cla_version}}`
+- `{{source_repo}}`
+- `{{source_pr_number}}`
+- `{{source_comment_id}}`
+- `{{registry_repository}}`
+- `{{registry_path}}`
+
+## Leave a Registry Trail on the PR
+
+If you want the success comment and check summary to include links to the matching registry records, enable:
+
+```yaml
+status:
+  include_registry_links: true
+```
+
+This works for both backends. For `json-repo`, the links point to the signer JSON file. For `issue`, the links point to the signer issue.
 
 ## Token Setup
 

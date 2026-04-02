@@ -58,6 +58,73 @@ describe('CLA action flow', () => {
     expect(prComment?.body).toContain('CLA requirements are satisfied');
   });
 
+  it('can add registry links to the success comment', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({
+        registryType: 'json-repo',
+        includeRegistryLinks: true,
+      }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      comment: {
+        id: 100,
+        body: 'I have read and agree to the CLA.',
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
+
+    expect(check?.summary).toContain('Registry records:');
+    expect(prComment?.body).toContain('Registry records:');
+    expect(prComment?.body).toContain(
+      'https://github.com/overtrue/cla-registry/blob/main/signatures/individual/alice.json',
+    );
+  });
+
+  it('can add issue registry links to the success comment', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({
+        includeRegistryLinks: true,
+      }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      comment: {
+        id: 100,
+        body: 'I have read and agree to the CLA.',
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
+
+    expect(prComment?.body).toContain('Registry records:');
+    expect(prComment?.body).toContain('https://github.com/overtrue/cla-registry/issues/1');
+  });
+
   it('stays red when only part of the contributor set has signed', async () => {
     const client = new MemoryGitHubClient();
     client.seedFile({

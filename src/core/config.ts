@@ -45,15 +45,18 @@ const rawConfigSchema = z.object({
     type: z.enum(['issue', 'json-repo']),
     repository: z.string().regex(/^[^/]+\/[^/]+$/, 'registry.repository must be owner/repo'),
     path_prefix: z.string().min(1).default('signatures'),
+    commit_message_template: z.string().min(1).default('chore: record CLA signature for {{github_login}}'),
   }),
   status: z
     .object({
       check_name: z.string().min(1).default('CLA Check'),
       comment_tag: z.string().min(1).default('<!-- cla-bot -->'),
+      include_registry_links: z.boolean().default(false),
     })
     .default({
       check_name: 'CLA Check',
       comment_tag: '<!-- cla-bot -->',
+      include_registry_links: false,
     }),
 });
 
@@ -84,10 +87,12 @@ export function parseClaConfig(raw: string): ClaConfig {
         type: parsed.registry.type,
         repository: parsed.registry.repository,
         pathPrefix: parsed.registry.path_prefix,
+        commitMessageTemplate: parsed.registry.commit_message_template,
       },
       status: {
         checkName: parsed.status.check_name,
         commentTag: parsed.status.comment_tag,
+        includeRegistryLinks: parsed.status.include_registry_links,
       },
     };
   } catch (error) {

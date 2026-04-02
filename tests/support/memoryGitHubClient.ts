@@ -15,6 +15,13 @@ type StoredIssue = IssueSnapshot & {
   comments: IssueCommentSnapshot[];
 };
 
+type StoredFileWrite = {
+  path: string;
+  content: string;
+  message: string;
+  sha?: string;
+};
+
 type StoredCheckRun = {
   name: string;
   headSha: string;
@@ -28,6 +35,7 @@ type RepoState = {
   pulls: Map<number, PullRequestSnapshot>;
   commits: Map<number, PullCommit[]>;
   issues: Map<number, StoredIssue>;
+  fileWrites: StoredFileWrite[];
   checkRuns: StoredCheckRun[];
   nextIssueNumber: number;
   nextCommentId: number;
@@ -38,6 +46,14 @@ function repoKey(input: RepoCoordinates): string {
   return `${input.owner}/${input.repo}`;
 }
 
+function fileHtmlUrl(input: RepoCoordinates & { path: string }): string {
+  return `https://github.com/${input.owner}/${input.repo}/blob/main/${input.path}`;
+}
+
+function issueHtmlUrl(input: RepoCoordinates & { issueNumber: number }): string {
+  return `https://github.com/${input.owner}/${input.repo}/issues/${input.issueNumber}`;
+}
+
 export class MemoryGitHubClient implements GitHubClient {
   private readonly repos = new Map<string, RepoState>();
 
@@ -46,6 +62,7 @@ export class MemoryGitHubClient implements GitHubClient {
     state.files.set(input.path, {
       content: input.content,
       sha: input.sha ?? `sha-${state.nextSha++}`,
+      htmlUrl: fileHtmlUrl(input),
     });
   }
 
@@ -57,6 +74,7 @@ export class MemoryGitHubClient implements GitHubClient {
       number: pullRequest.pullNumber,
       title: `PR #${pullRequest.pullNumber}`,
       body: '',
+      htmlUrl: issueHtmlUrl({ ...pullRequest, issueNumber: pullRequest.pullNumber }),
       labels: [],
       comments: [],
     });
@@ -79,6 +97,10 @@ export class MemoryGitHubClient implements GitHubClient {
     return [...this.ensureRepo(input).checkRuns];
   }
 
+  getFileWrites(input: RepoCoordinates): StoredFileWrite[] {
+    return [...this.ensureRepo(input).fileWrites];
+  }
+
   getFile(input: RepoCoordinates & { path: string }): RepoFile | undefined {
     return this.ensureRepo(input).files.get(input.path);
   }
@@ -87,14 +109,23 @@ export class MemoryGitHubClient implements GitHubClient {
     return this.ensureRepo(input).files.get(input.path) ?? null;
   }
 
-  async writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<void> {
+  async writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<RepoFile> {
     const state = this.ensureRepo(input);
-    const sha = `sha-${state.nextSha++}`;
-
-    state.files.set(input.path, {
+    const file = {
       content: input.content,
-      sha,
+      sha: `sha-${state.nextSha++}`,
+      htmlUrl: fileHtmlUrl(input),
+    };
+
+    state.files.set(input.path, file);
+    state.fileWrites.push({
+      path: input.path,
+      content: input.content,
+      message: input.message,
+      ...(input.sha ? { sha: input.sha } : {}),
     });
+
+    return file;
   }
 
   async getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot> {
@@ -121,10 +152,12 @@ export class MemoryGitHubClient implements GitHubClient {
 
   async createIssue(input: RepoCoordinates & { title: string; body: string; labels: string[] }): Promise<IssueSnapshot> {
     const state = this.ensureRepo(input);
+    const number = state.nextIssueNumber++;
     const issue: StoredIssue = {
-      number: state.nextIssueNumber++,
+      number,
       title: input.title,
       body: input.body,
+      htmlUrl: issueHtmlUrl({ ...input, issueNumber: number }),
       labels: [...input.labels],
       comments: [],
     };
@@ -200,6 +233,7 @@ export class MemoryGitHubClient implements GitHubClient {
       pulls: new Map(),
       commits: new Map(),
       issues: new Map(),
+      fileWrites: [],
       checkRuns: [],
       nextIssueNumber: 1,
       nextCommentId: 1,
@@ -222,6 +256,7 @@ export class MemoryGitHubClient implements GitHubClient {
       number: input.issueNumber,
       title: `Issue #${input.issueNumber}`,
       body: '',
+      htmlUrl: issueHtmlUrl(input),
       labels: [],
       comments: [],
     };

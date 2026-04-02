@@ -24,12 +24,40 @@ function buildFailureComment(config: ClaConfig, evaluation: ClaEvaluation): stri
   ].join('\n');
 }
 
-function buildSuccessComment(config: ClaConfig): string {
-  return [config.status.commentTag, '', 'CLA requirements are satisfied for this pull request.'].join('\n');
+function buildRegistryLinks(config: ClaConfig, evaluation: ClaEvaluation): string[] {
+  if (!config.status.includeRegistryLinks) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  return evaluation.results.flatMap(result => {
+    const url = result.signature?.registryUrl;
+
+    if (!result.signed || !url || seen.has(url)) {
+      return [];
+    }
+
+    seen.add(url);
+    return [`- @${result.contributor.githubLogin}: <${url}>`];
+  });
+}
+
+function buildSuccessComment(config: ClaConfig, evaluation: ClaEvaluation): string {
+  const registryLinks = buildRegistryLinks(config, evaluation);
+
+  return [
+    config.status.commentTag,
+    '',
+    'CLA requirements are satisfied for this pull request.',
+    ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
+  ].join('\n');
 }
 
 function buildSummary(config: ClaConfig, evaluation: ClaEvaluation): { title: string; summary: string } {
   if (evaluation.missing.length === 0) {
+    const registryLinks = buildRegistryLinks(config, evaluation);
+
     return {
       title: 'CLA satisfied',
       summary: [
@@ -38,6 +66,7 @@ function buildSummary(config: ClaConfig, evaluation: ClaEvaluation): { title: st
         'Contributors checked:',
         '',
         evaluation.contributors.length === 0 ? '- none' : formatContributors(evaluation.contributors),
+        ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
       ].join('\n'),
     };
   }
@@ -104,7 +133,7 @@ export class GitHubStatusReporter {
     const existing = comments.find(comment => comment.body.includes(input.config.status.commentTag));
     const body =
       input.evaluation.missing.length === 0
-        ? buildSuccessComment(input.config)
+        ? buildSuccessComment(input.config, input.evaluation)
         : buildFailureComment(input.config, input.evaluation);
 
     if (existing) {

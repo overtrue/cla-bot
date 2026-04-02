@@ -426,15 +426,18 @@ const rawConfigSchema = zod_1.z.object({
         type: zod_1.z.enum(['issue', 'json-repo']),
         repository: zod_1.z.string().regex(/^[^/]+\/[^/]+$/, 'registry.repository must be owner/repo'),
         path_prefix: zod_1.z.string().min(1).default('signatures'),
+        commit_message_template: zod_1.z.string().min(1).default('chore: record CLA signature for {{github_login}}'),
     }),
     status: zod_1.z
         .object({
         check_name: zod_1.z.string().min(1).default('CLA Check'),
         comment_tag: zod_1.z.string().min(1).default('<!-- cla-bot -->'),
+        include_registry_links: zod_1.z.boolean().default(false),
     })
         .default({
         check_name: 'CLA Check',
         comment_tag: '<!-- cla-bot -->',
+        include_registry_links: false,
     }),
 });
 function parseClaConfig(raw) {
@@ -464,10 +467,12 @@ function parseClaConfig(raw) {
                 type: parsed.registry.type,
                 repository: parsed.registry.repository,
                 pathPrefix: parsed.registry.path_prefix,
+                commitMessageTemplate: parsed.registry.commit_message_template,
             },
             status: {
                 checkName: parsed.status.check_name,
                 commentTag: parsed.status.comment_tag,
+                includeRegistryLinks: parsed.status.include_registry_links,
             },
         };
     }
@@ -653,6 +658,7 @@ class OctokitGitHubClient {
             return {
                 content: decodeContent(response.data.content),
                 sha: response.data.sha,
+                ...(response.data.html_url ? { htmlUrl: response.data.html_url } : {}),
             };
         }
         catch (error) {
@@ -663,7 +669,7 @@ class OctokitGitHubClient {
         }
     }
     async writeFile(input) {
-        await this.octokit.rest.repos.createOrUpdateFileContents({
+        const response = await this.octokit.rest.repos.createOrUpdateFileContents({
             owner: input.owner,
             repo: input.repo,
             path: input.path,
@@ -671,6 +677,11 @@ class OctokitGitHubClient {
             content: Buffer.from(input.content, 'utf8').toString('base64'),
             ...(input.sha ? { sha: input.sha } : {}),
         });
+        return {
+            content: input.content,
+            sha: response.data.content?.sha ?? input.sha ?? 'written-file',
+            ...(response.data.content?.html_url ? { htmlUrl: response.data.content.html_url } : {}),
+        };
     }
     async getPullRequest(input) {
         const response = await this.octokit.rest.pulls.get({
@@ -724,6 +735,7 @@ class OctokitGitHubClient {
             number: match.number,
             title: match.title,
             body: match.body ?? '',
+            ...(match.html_url ? { htmlUrl: match.html_url } : {}),
         };
     }
     async createIssue(input) {
@@ -738,6 +750,7 @@ class OctokitGitHubClient {
             number: issue.data.number,
             title: issue.data.title,
             body: issue.data.body ?? '',
+            ...(issue.data.html_url ? { htmlUrl: issue.data.html_url } : {}),
         };
     }
     async updateIssue(input) {
@@ -752,6 +765,7 @@ class OctokitGitHubClient {
             number: issue.data.number,
             title: issue.data.title,
             body: issue.data.body ?? '',
+            ...(issue.data.html_url ? { htmlUrl: issue.data.html_url } : {}),
         };
     }
     async createIssueComment(input) {
@@ -823,11 +837,32 @@ function buildFailureComment(config, evaluation) {
         `<${evaluation.cla.url}>`,
     ].join('\n');
 }
-function buildSuccessComment(config) {
-    return [config.status.commentTag, '', 'CLA requirements are satisfied for this pull request.'].join('\n');
+function buildRegistryLinks(config, evaluation) {
+    if (!config.status.includeRegistryLinks) {
+        return [];
+    }
+    const seen = new Set();
+    return evaluation.results.flatMap(result => {
+        const url = result.signature?.registryUrl;
+        if (!result.signed || !url || seen.has(url)) {
+            return [];
+        }
+        seen.add(url);
+        return [`- @${result.contributor.githubLogin}: <${url}>`];
+    });
+}
+function buildSuccessComment(config, evaluation) {
+    const registryLinks = buildRegistryLinks(config, evaluation);
+    return [
+        config.status.commentTag,
+        '',
+        'CLA requirements are satisfied for this pull request.',
+        ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
+    ].join('\n');
 }
 function buildSummary(config, evaluation) {
     if (evaluation.missing.length === 0) {
+        const registryLinks = buildRegistryLinks(config, evaluation);
         return {
             title: 'CLA satisfied',
             summary: [
@@ -836,6 +871,7 @@ function buildSummary(config, evaluation) {
                 'Contributors checked:',
                 '',
                 evaluation.contributors.length === 0 ? '- none' : formatContributors(evaluation.contributors),
+                ...(registryLinks.length === 0 ? [] : ['', 'Registry records:', '', ...registryLinks]),
             ].join('\n'),
         };
     }
@@ -888,7 +924,7 @@ class GitHubStatusReporter {
         });
         const existing = comments.find(comment => comment.body.includes(input.config.status.commentTag));
         const body = input.evaluation.missing.length === 0
-            ? buildSuccessComment(input.config)
+            ? buildSuccessComment(input.config, input.evaluation)
             : buildFailureComment(input.config, input.evaluation);
         if (existing) {
             await this.client.updateIssueComment({
@@ -975,7 +1011,7 @@ function createRegistry(client, config) {
     if (config.registry.type === 'issue') {
         return new issueRegistry_1.IssueRegistry(client, registryRepo);
     }
-    return new jsonRepoRegistry_1.JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix);
+    return new jsonRepoRegistry_1.JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.registry.commitMessageTemplate);
 }
 
 
@@ -1061,6 +1097,9 @@ function pickSignature(records, claVersion) {
         .filter(record => record.claVersion === claVersion)
         .sort((left, right) => right.signedAt.localeCompare(left.signedAt))[0] ?? null);
 }
+function withRegistryUrl(record, registryUrl) {
+    return registryUrl ? { ...record, registryUrl } : record;
+}
 class IssueRegistry {
     client;
     registryRepo;
@@ -1078,7 +1117,8 @@ class IssueRegistry {
             return null;
         }
         const records = await this.loadRecords(issue.number, issue.body);
-        return pickSignature(records, input.claVersion);
+        const match = pickSignature(records, input.claVersion);
+        return match ? withRegistryUrl(match, issue.htmlUrl) : null;
     }
     async saveSignature(record) {
         const title = this.titleFor(record.githubLogin);
@@ -1101,14 +1141,14 @@ class IssueRegistry {
                 issueNumber: issue.number,
                 body: toIssueComment(record),
             });
-            return record;
+            return withRegistryUrl(record, issue.htmlUrl);
         }
         const records = await this.loadRecords(existingIssue.number, existingIssue.body);
         const existing = pickSignature(records, record.claVersion);
         if (existing) {
-            return existing;
+            return withRegistryUrl(existing, existingIssue.htmlUrl);
         }
-        await this.client.updateIssue({
+        const updatedIssue = await this.client.updateIssue({
             owner: this.registryRepo.owner,
             repo: this.registryRepo.repo,
             issueNumber: existingIssue.number,
@@ -1121,7 +1161,7 @@ class IssueRegistry {
             issueNumber: existingIssue.number,
             body: toIssueComment(record),
         });
-        return record;
+        return withRegistryUrl(record, updatedIssue.htmlUrl);
     }
     async loadRecords(issueNumber, issueBody) {
         const comments = await this.client.listIssueComments({
@@ -1150,7 +1190,7 @@ exports.IssueRegistry = IssueRegistry;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.JsonRepoRegistry = void 0;
-function fromJsonSignature(login, signerType, signature) {
+function fromJsonSignature(login, signerType, signature, registryUrl) {
     return {
         githubLogin: login,
         signerType,
@@ -1162,6 +1202,7 @@ function fromJsonSignature(login, signerType, signature) {
         sourcePrNumber: signature.source_pr_number,
         ...(signature.source_comment_id ? { sourceCommentId: signature.source_comment_id } : {}),
         registryType: 'json-repo',
+        ...(registryUrl ? { registryUrl } : {}),
     };
 }
 function toJsonSignature(record) {
@@ -1178,14 +1219,19 @@ function toJsonSignature(record) {
 function stringify(file) {
     return `${JSON.stringify(file, null, 2)}\n`;
 }
+function renderTemplate(template, values) {
+    return template.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (match, key) => key in values ? (values[key] ?? match) : match);
+}
 class JsonRepoRegistry {
     client;
     registryRepo;
     pathPrefix;
-    constructor(client, registryRepo, pathPrefix) {
+    commitMessageTemplate;
+    constructor(client, registryRepo, pathPrefix, commitMessageTemplate) {
         this.client = client;
         this.registryRepo = registryRepo;
         this.pathPrefix = pathPrefix;
+        this.commitMessageTemplate = commitMessageTemplate;
     }
     async findSignature(input) {
         const file = await this.loadFile(input.githubLogin, 'individual');
@@ -1193,44 +1239,45 @@ class JsonRepoRegistry {
             return null;
         }
         const match = file.signatures.find(signature => signature.cla_version === input.claVersion);
-        return match ? fromJsonSignature(file.github_login, file.signer_type, match) : null;
+        return match ? fromJsonSignature(file.github_login, file.signer_type, match, file.registryUrl) : null;
     }
     async saveSignature(record) {
         const path = this.pathFor(record.githubLogin, record.signerType);
+        const message = this.commitMessageFor(record, path);
         const existing = await this.client.readFile({
             owner: this.registryRepo.owner,
             repo: this.registryRepo.repo,
             path,
         });
         if (!existing) {
-            await this.client.writeFile({
+            const file = await this.client.writeFile({
                 owner: this.registryRepo.owner,
                 repo: this.registryRepo.repo,
                 path,
-                message: `chore: record CLA signature for ${record.githubLogin}`,
+                message,
                 content: stringify({
                     github_login: record.githubLogin,
                     signer_type: record.signerType,
                     signatures: [toJsonSignature(record)],
                 }),
             });
-            return record;
+            return file.htmlUrl ? { ...record, registryUrl: file.htmlUrl } : record;
         }
         const parsed = JSON.parse(existing.content);
         const match = parsed.signatures.find(signature => signature.cla_version === record.claVersion);
         if (match) {
-            return fromJsonSignature(parsed.github_login, parsed.signer_type, match);
+            return fromJsonSignature(parsed.github_login, parsed.signer_type, match, existing.htmlUrl);
         }
         parsed.signatures.push(toJsonSignature(record));
-        await this.client.writeFile({
+        const file = await this.client.writeFile({
             owner: this.registryRepo.owner,
             repo: this.registryRepo.repo,
             path,
             sha: existing.sha,
-            message: `chore: record CLA signature for ${record.githubLogin}`,
+            message,
             content: stringify(parsed),
         });
-        return record;
+        return file.htmlUrl ? { ...record, registryUrl: file.htmlUrl } : record;
     }
     async loadFile(login, signerType) {
         const file = await this.client.readFile({
@@ -1238,10 +1285,27 @@ class JsonRepoRegistry {
             repo: this.registryRepo.repo,
             path: this.pathFor(login, signerType),
         });
-        return file ? JSON.parse(file.content) : null;
+        return file
+            ? {
+                ...JSON.parse(file.content),
+                ...(file.htmlUrl ? { registryUrl: file.htmlUrl } : {}),
+            }
+            : null;
     }
     pathFor(login, signerType) {
         return `${this.pathPrefix}/${signerType}/${login}.json`;
+    }
+    commitMessageFor(record, path) {
+        return renderTemplate(this.commitMessageTemplate, {
+            github_login: record.githubLogin,
+            signer_type: record.signerType,
+            cla_version: record.claVersion,
+            source_repo: record.sourceRepo,
+            source_pr_number: String(record.sourcePrNumber),
+            source_comment_id: record.sourceCommentId ? String(record.sourceCommentId) : '',
+            registry_repository: `${this.registryRepo.owner}/${this.registryRepo.repo}`,
+            registry_path: path,
+        });
     }
 }
 exports.JsonRepoRegistry = JsonRepoRegistry;
