@@ -5,6 +5,8 @@ import { handlePullRequestTarget } from '../../src/action/handlePullRequestTarge
 import { claConfigYaml, commit, pullRequest } from '../support/fixtures';
 import { MemoryGitHubClient } from '../support/memoryGitHubClient';
 
+const registryAccess = { hasExplicitRegistryToken: true } as const;
+
 describe('CLA action flow', () => {
   it('fails a PR when the author has not signed', async () => {
     const client = new MemoryGitHubClient();
@@ -16,7 +18,7 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
 
     const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
     const comment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
@@ -36,11 +38,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -75,11 +78,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -115,7 +119,7 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
 
     const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
     const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
@@ -140,11 +144,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -169,11 +174,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), [commit('bob')]);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -197,11 +203,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), [commit('bob')]);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -213,6 +220,7 @@ describe('CLA action flow', () => {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 101,
         body: 'I have read and agree to the CLA.',
@@ -235,11 +243,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -256,7 +265,7 @@ describe('CLA action flow', () => {
     });
     client.setPullRequestCommits({ owner: 'app', repo: 'demo', pullNumber: 1 }, [commit('charlie')]);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
 
     const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
     expect(check?.conclusion).toBe('failure');
@@ -273,11 +282,12 @@ describe('CLA action flow', () => {
     });
     client.seedPullRequest(pullRequest(), []);
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
     await handleIssueComment(client, client, {
       owner: 'app',
       repo: 'demo',
       pullNumber: 1,
+      ...registryAccess,
       comment: {
         id: 100,
         body: 'I have read and agree to the CLA.',
@@ -293,7 +303,7 @@ describe('CLA action flow', () => {
       content: claConfigYaml({ version: 'v2' }),
     });
 
-    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
 
     const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
     expect(check?.conclusion).toBe('failure');

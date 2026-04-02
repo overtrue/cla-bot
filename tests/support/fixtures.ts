@@ -5,6 +5,7 @@ export function claConfigYaml(input?: {
   repository?: string;
   registryType?: RegistryType;
   pathPrefix?: string;
+  branch?: string;
   allowlist?: string[];
   caseInsensitive?: boolean;
   trimWhitespace?: boolean;
@@ -102,6 +103,7 @@ export function claConfigYaml(input?: {
     ...(input?.registryType === 'json-repo' || input?.pathPrefix
       ? [`  path_prefix: ${input?.pathPrefix ?? 'signatures'}`]
       : []),
+    ...(input?.branch ? [`  branch: ${input.branch}`] : []),
     '',
     'status:',
     '  check_name: CLA Check',

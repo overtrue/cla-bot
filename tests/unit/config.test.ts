@@ -19,6 +19,7 @@ describe('parseClaConfig', () => {
     expect(config.signing.commentPattern).toBe('I have read and agree to the CLA.');
     expect(config.contributors.checkCommitAuthors).toBe(true);
     expect(config.registry.pathPrefix).toBe('signatures');
+    expect(config.registry.branch).toBeUndefined();
     expect(config.status.checkName).toBe('CLA Check');
     expect(config.templates.registry.commitMessage).toBe('chore: record CLA signature for {{github_login}}');
     expect(config.templates.pr.successComment).toBe('CLA requirements are satisfied for this pull request.');
@@ -50,6 +51,19 @@ describe('parseClaConfig', () => {
     expect(config.templates.check.successTitle).toBe('All signed');
   });
 
+  it('parses json-repo branch mode', () => {
+    const config = parseClaConfig(
+      claConfigYaml({
+        registryType: 'json-repo',
+        repository: 'overtrue/demo',
+        branch: 'cla-signatures',
+      }),
+    );
+
+    expect(config.registry.type).toBe('json-repo');
+    expect(config.registry.branch).toBe('cla-signatures');
+  });
+
   it('fails on missing required fields', () => {
     expect(() =>
       parseClaConfig([
@@ -66,5 +80,17 @@ describe('parseClaConfig', () => {
     expect(() => parseClaConfig(claConfigYaml({ registryType: 'issue' }).replace('type: issue', 'type: sqlite'))).toThrow(
       /Invalid \.github\/cla\.yml/,
     );
+  });
+
+  it('fails when issue backend is configured with a branch', () => {
+    expect(() =>
+      parseClaConfig(
+        claConfigYaml({
+          registryType: 'issue',
+          repository: 'overtrue/demo',
+          branch: 'cla-signatures',
+        }),
+      ),
+    ).toThrow(/registry\.branch is only supported for json-repo/);
   });
 });

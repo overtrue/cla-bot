@@ -20,8 +20,10 @@ contributors:
     - github-actions[bot]
 
 registry:
-  type: issue
+  type: json-repo
   repository: overtrue/your-repo
+  path_prefix: signatures
+  branch: cla-signatures
 
 status:
   check_name: CLA Check

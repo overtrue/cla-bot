@@ -56,6 +56,7 @@ export type ClaConfig = {
     type: RegistryType;
     repository: string;
     pathPrefix: string;
+    branch?: string;
   };
   status: {
     checkName: string;

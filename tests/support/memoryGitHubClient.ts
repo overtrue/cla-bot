@@ -20,6 +20,7 @@ type StoredFileWrite = {
   content: string;
   message: string;
   sha?: string;
+  branch?: string;
 };
 
 type StoredCheckRun = {
@@ -31,7 +32,7 @@ type StoredCheckRun = {
 };
 
 type RepoState = {
-  files: Map<string, RepoFile>;
+  refs: Map<string, Map<string, RepoFile>>;
   pulls: Map<number, PullRequestSnapshot>;
   commits: Map<number, PullCommit[]>;
   issues: Map<number, StoredIssue>;
@@ -40,14 +41,15 @@ type RepoState = {
   nextIssueNumber: number;
   nextCommentId: number;
   nextSha: number;
+  defaultRef: string;
 };
 
 function repoKey(input: RepoCoordinates): string {
   return `${input.owner}/${input.repo}`;
 }
 
-function fileHtmlUrl(input: RepoCoordinates & { path: string }): string {
-  return `https://github.com/${input.owner}/${input.repo}/blob/main/${input.path}`;
+function fileHtmlUrl(input: RepoCoordinates & { path: string; ref?: string }): string {
+  return `https://github.com/${input.owner}/${input.repo}/blob/${input.ref ?? 'main'}/${input.path}`;
 }
 
 function issueHtmlUrl(input: RepoCoordinates & { issueNumber: number }): string {
@@ -57,9 +59,9 @@ function issueHtmlUrl(input: RepoCoordinates & { issueNumber: number }): string 
 export class MemoryGitHubClient implements GitHubClient {
   private readonly repos = new Map<string, RepoState>();
 
-  seedFile(input: RepoCoordinates & { path: string; content: string; sha?: string }): void {
+  seedFile(input: RepoCoordinates & { path: string; content: string; sha?: string; ref?: string }): void {
     const state = this.ensureRepo(input);
-    state.files.set(input.path, {
+    this.ensureRef(state, input.ref ?? state.defaultRef).set(input.path, {
       content: input.content,
       sha: input.sha ?? `sha-${state.nextSha++}`,
       htmlUrl: fileHtmlUrl(input),
@@ -101,31 +103,54 @@ export class MemoryGitHubClient implements GitHubClient {
     return [...this.ensureRepo(input).fileWrites];
   }
 
-  getFile(input: RepoCoordinates & { path: string }): RepoFile | undefined {
-    return this.ensureRepo(input).files.get(input.path);
+  getFile(input: RepoCoordinates & { path: string; ref?: string }): RepoFile | undefined {
+    return this.refFiles(this.ensureRepo(input), input.ref)?.get(input.path);
   }
 
-  async readFile(input: RepoCoordinates & { path: string }): Promise<RepoFile | null> {
-    return this.ensureRepo(input).files.get(input.path) ?? null;
+  async readFile(input: RepoCoordinates & { path: string; ref?: string }): Promise<RepoFile | null> {
+    return this.refFiles(this.ensureRepo(input), input.ref)?.get(input.path) ?? null;
   }
 
-  async writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<RepoFile> {
+  async writeFile(input: RepoCoordinates & {
+    path: string;
+    content: string;
+    message: string;
+    sha?: string;
+    branch?: string;
+  }): Promise<RepoFile> {
     const state = this.ensureRepo(input);
+    const ref = input.branch ?? state.defaultRef;
     const file = {
       content: input.content,
       sha: `sha-${state.nextSha++}`,
-      htmlUrl: fileHtmlUrl(input),
+      htmlUrl: fileHtmlUrl({ ...input, ref }),
     };
 
-    state.files.set(input.path, file);
+    this.ensureRef(state, ref).set(input.path, file);
     state.fileWrites.push({
       path: input.path,
       content: input.content,
       message: input.message,
       ...(input.sha ? { sha: input.sha } : {}),
+      ...(input.branch ? { branch: input.branch } : {}),
     });
 
     return file;
+  }
+
+  async ensureBranch(input: RepoCoordinates & { branch: string }): Promise<void> {
+    const state = this.ensureRepo(input);
+
+    if (state.refs.has(input.branch)) {
+      return;
+    }
+
+    const files = new Map<string, RepoFile>();
+    for (const [path, file] of this.ensureRef(state, state.defaultRef).entries()) {
+      files.set(path, { ...file });
+    }
+
+    state.refs.set(input.branch, files);
   }
 
   async getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot> {
@@ -229,7 +254,7 @@ export class MemoryGitHubClient implements GitHubClient {
     }
 
     const created: RepoState = {
-      files: new Map(),
+      refs: new Map([['main', new Map()]]),
       pulls: new Map(),
       commits: new Map(),
       issues: new Map(),
@@ -238,6 +263,7 @@ export class MemoryGitHubClient implements GitHubClient {
       nextIssueNumber: 1,
       nextCommentId: 1,
       nextSha: 1,
+      defaultRef: 'main',
     };
 
     this.repos.set(key, created);
@@ -263,6 +289,22 @@ export class MemoryGitHubClient implements GitHubClient {
 
     state.issues.set(input.issueNumber, created);
     state.nextIssueNumber = Math.max(state.nextIssueNumber, input.issueNumber + 1);
+    return created;
+  }
+
+  private refFiles(state: RepoState, ref?: string): Map<string, RepoFile> | undefined {
+    return state.refs.get(ref ?? state.defaultRef);
+  }
+
+  private ensureRef(state: RepoState, ref: string): Map<string, RepoFile> {
+    const existing = state.refs.get(ref);
+
+    if (existing) {
+      return existing;
+    }
+
+    const created = new Map<string, RepoFile>();
+    state.refs.set(ref, created);
     return created;
   }
 }

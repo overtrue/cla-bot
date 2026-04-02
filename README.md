@@ -2,15 +2,73 @@
 
 GitHub Action that blocks pull requests until each required contributor signs your CLA by posting an exact PR comment.
 
+If you build or test this repository locally, use Node 24.
+
+## Recommended Modes
+
+Use these modes in this order.
+
+1. Same repository + `issue` backend
+   This is the default recommendation. No extra token, no extra repository, no extra commits.
+2. Cross-repository + `issue` backend
+   Use this if you do not want CLA issues in the target repository. Requires `registry-token`.
+3. Same repository + `json-repo` backend on a dedicated branch
+   Use this if you want file-based signature records but do not want them on your default branch.
+4. Cross-repository + `json-repo` backend
+   This is the most operationally heavy mode. Use it only if you specifically want file-based records in a separate repository.
+
+If you just want CLA enforcement to work with the least setup, start with same repository + `issue`.
+
 ## Quick Start
 
-1. Create a registry repository, for example `overtrue/cla-registry`.
-2. Add `.github/cla.yml` to the target repository.
-3. Add `.github/workflows/cla.yml` to the target repository.
-4. If the registry repository is different from the target repository, add a secret named `CLA_BOT_REGISTRY_TOKEN`.
-5. Open a pull request. The bot will post signing instructions when a signature is missing.
+Replace `overtrue/your-repo` with the repository that runs the workflow.
 
-If you build or test this repository locally, use Node 24.
+Add `.github/cla.yml`:
+
+```yaml
+document:
+  version: v1
+  url: https://example.com/cla/v1
+
+registry:
+  type: issue
+  repository: overtrue/your-repo
+```
+
+Add `.github/workflows/cla.yml`:
+
+```yaml
+name: CLA Check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run CLA Bot
+        uses: overtrue/cla-bot@v0.0.1
+        with:
+          github-token: ${{ github.token }}
+```
+
+Open a pull request. The bot will post signing instructions when a signature is missing.
+
+Copy-ready examples:
+
+- [Same-repo issue config](./examples/cla.yml)
+- [Same-repo workflow](./examples/workflow.same-repo.yml)
 
 ## How It Works
 
@@ -25,7 +83,22 @@ flowchart LR
   C -->|Yes| G["PR can be merged"]
 ```
 
-## Add `.github/cla.yml`
+## How Contributors Sign
+
+When a PR is missing signatures, the bot posts a comment listing the missing contributors.
+
+Each missing contributor must comment exactly:
+
+```text
+I have read and agree to the CLA.
+```
+
+By default the bot checks:
+
+- the PR author
+- all commit authors
+
+## `.github/cla.yml`
 
 The file does not need to be fully specified. This is the smallest useful config:
 
@@ -36,12 +109,12 @@ document:
 
 registry:
   type: issue
-  repository: overtrue/cla-registry
+  repository: overtrue/your-repo
 ```
 
 Everything else falls back to sensible defaults.
 
-Full example using the issue backend:
+Full example using the `issue` backend:
 
 ```yaml
 enabled: true
@@ -67,21 +140,89 @@ contributors:
 
 registry:
   type: issue
-  repository: overtrue/cla-registry
+  repository: overtrue/your-repo
 
 status:
   check_name: CLA Check
   comment_tag: <!-- cla-bot -->
 ```
 
+## Registry Backends
+
+### `issue`
+
+Use `issue` if you want the simplest setup and easy manual inspection.
+
+```yaml
+registry:
+  type: issue
+  repository: overtrue/your-repo
+```
+
+### `json-repo`
+
+Use `json-repo` if you want one JSON file per signer.
+
+```yaml
+registry:
+  type: json-repo
+  repository: overtrue/cla-registry
+  path_prefix: signatures
+```
+
+If you want `json-repo` in the same repository without polluting the default branch, set `registry.branch`:
+
+```yaml
+registry:
+  type: json-repo
+  repository: overtrue/your-repo
+  path_prefix: signatures
+  branch: cla-signatures
+```
+
+When `registry.branch` is set, CLA Bot reads and writes JSON signature files on that branch. If the branch does not exist yet, CLA Bot creates it from the repository's default branch on first write.
+
 Copy-ready examples:
 
-- [Issue backend](./examples/cla.yml)
-- [JSON backend](./examples/cla.json-repo.yml)
+- [Same-repo issue config](./examples/cla.yml)
+- [Same-repo json-repo on a dedicated branch](./examples/cla.json-branch.yml)
+- [Cross-repo json-repo config](./examples/cla.json-repo.yml)
 
-## Add `.github/workflows/cla.yml`
+## Workflow Examples
 
-If the registry repository is separate from the target repository:
+### Same Repository
+
+For same-repo `issue`, and for same-repo `json-repo` on a dedicated branch, `github.token` is enough:
+
+```yaml
+name: CLA Check
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run CLA Bot
+        uses: overtrue/cla-bot@v0.0.1
+        with:
+          github-token: ${{ github.token }}
+```
+
+### Cross Repository
+
+If the registry repository is different from the target repository, pass `registry-token`:
 
 ```yaml
 name: CLA Check
@@ -110,72 +251,10 @@ jobs:
           registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
 ```
 
-If the registry is the same repository, `github.token` is enough:
-
-```yaml
-name: CLA Check
-
-on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-  issue_comment:
-    types: [created]
-
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  checks: write
-
-jobs:
-  cla:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.1
-        with:
-          github-token: ${{ github.token }}
-```
-
 Copy-ready examples:
 
-- [Cross-repo registry workflow](./examples/workflow.yml)
-- [Same-repo registry workflow](./examples/workflow.same-repo.yml)
-
-## How Contributors Sign
-
-When a PR is missing signatures, the bot posts a comment listing the missing contributors.
-
-Each missing contributor must comment exactly:
-
-```text
-I have read and agree to the CLA.
-```
-
-By default the bot checks:
-
-- the PR author
-- all commit authors
-
-## Choose a Registry Backend
-
-Use `issue` if you want the simplest setup and easy manual inspection.
-
-```yaml
-registry:
-  type: issue
-  repository: overtrue/cla-registry
-```
-
-Use `json-repo` if you want one JSON file per signer.
-
-```yaml
-registry:
-  type: json-repo
-  repository: overtrue/cla-registry
-  path_prefix: signatures
-```
+- [Cross-repo workflow with PAT or pre-minted token](./examples/workflow.yml)
+- [Cross-repo workflow with GitHub App token minting](./examples/workflow.github-app.yml)
 
 ## Customize Templates
 
@@ -245,20 +324,96 @@ Available placeholders for `templates.pr.*` and `templates.check.*`:
 
 `{{registry_links_markdown}}` works for both backends. For `json-repo`, the links point to the signer JSON file. For `issue`, the links point to the signer issue.
 
-## Token Setup
+## Cross-Repo Token Setup
 
 `github-token`
 
 - Required.
 - Used to read the target repository and update PR comments and checks.
-- In workflows, use `${{ github.token }}`.
+- In workflows, use `${{ github.token }}` unless you intentionally replace it.
 
 `registry-token`
 
-- Optional.
-- Needed when the registry repository is different from the target repository.
-- Must have write access to the registry repository.
-- A fine-grained PAT is the simplest option.
+- Optional for same-repo setups.
+- Required when `registry.repository` points to a different repository.
+- Used only for the registry repository.
+
+If `registry.repository` is different from the repository running the workflow, `${{ github.token }}` is usually not enough by itself. You need another credential for the registry repository.
+
+### PAT Mode
+
+This is the simplest cross-repo setup.
+
+- Create a fine-grained PAT that can access the registry repository.
+- Store it as `CLA_BOT_REGISTRY_TOKEN`.
+- Pass it as `registry-token`.
+
+Permission requirements:
+
+- `issue` backend: issue read/write access on the registry repository
+- `json-repo` backend: contents read/write access on the registry repository
+
+Operational impact of PAT mode:
+
+- The registry writer identity is the PAT owner.
+- Rotation and revocation are tied to a user account.
+- This is a good short-term or small-team solution.
+- This is usually not the best long-term organization-wide setup.
+
+### GitHub App Mode
+
+This is the recommended long-term cross-repo setup.
+
+Users create and manage their own GitHub App. CLA Bot does not require a shared vendor-managed app.
+
+Setup flow:
+
+1. Create a GitHub App for CLA Bot use.
+2. Grant only the permissions needed by your chosen registry backend.
+3. Install the app on the registry repository.
+4. Download a private key for the app.
+5. Store the app ID as `CLA_BOT_APP_ID` in Actions variables.
+6. Store the private key as `CLA_BOT_APP_PRIVATE_KEY` in Actions secrets.
+7. In the workflow, use `actions/create-github-app-token@v3` to mint a short-lived installation token and pass it as `registry-token`.
+
+Example for a cross-repo `issue` backend:
+
+```yaml
+- name: Create token for registry repo
+  id: registry-token
+  uses: actions/create-github-app-token@v3
+  with:
+    app-id: ${{ vars.CLA_BOT_APP_ID }}
+    private-key: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY }}
+    owner: overtrue
+    repositories: cla-registry
+    permission-issues: write
+
+- name: Run CLA Bot
+  uses: overtrue/cla-bot@v0.0.1
+  with:
+    github-token: ${{ github.token }}
+    registry-token: ${{ steps.registry-token.outputs.token }}
+```
+
+If you use the `json-repo` backend, change the app token permission to `permission-contents: write`.
+
+Operational impact of GitHub App mode:
+
+- The registry writer identity is the app installation, not a human signer.
+- Tokens are short-lived and minted inside the workflow.
+- Permissions are easier to scope and rotate than PATs.
+- This is the better fit for long-lived team or organization setups.
+
+## Registry Writer Identity
+
+The registry is written by the token identity, not by the human signer.
+
+- `issue` backend: the issue and comments are created by the identity behind `registry-token` or `github-token`.
+- `json-repo` backend: the commit is authored by the identity behind `registry-token` or `github-token`.
+- The actual signer is still recorded in the issue body or JSON payload as `github_login`.
+
+If you want the cleanest audit trail for humans, prefer `issue`.
 
 ## Use with AI
 
@@ -268,22 +423,19 @@ If you want an AI coding tool to integrate CLA Bot for you, give it this prompt 
 Integrate CLA Bot into this repository.
 
 Requirements:
-- Create or use the registry repository: overtrue/cla-registry
-- Use the issue backend
+- Start with same-repo issue backend
 - Add .github/cla.yml with the minimal working config
+- Point registry.repository at this repository
 - Add .github/workflows/cla.yml for pull_request_target and issue_comment
 - Use github.token for github-token
-- Use CLA_BOT_REGISTRY_TOKEN as the secret for registry-token if the registry repository is separate
+- Do not add registry-token unless registry.repository is a different repository
 - Keep the setup simple and do not add extra features
-- Update README or workflow comments only if needed to explain setup
 
 After the changes:
 - summarize what was added
 - list any required GitHub secrets
 - explain how contributors sign the CLA
 ```
-
-For a same-repo registry, tell the AI to omit `registry-token` and point `registry.repository` at the current repository.
 
 ## Common Questions
 
@@ -296,7 +448,9 @@ Why is the PR still blocked after someone signed?
 Why was no signature record written?
 
 - `registry.repository` points to the wrong repository.
-- `registry-token` is missing or cannot write to the registry repository.
+- In cross-repo mode, `registry-token` is missing or cannot write to the registry repository.
+- In `json-repo` mode, the token does not have contents write access.
+- In `issue` mode, the token does not have issues write access.
 
 Can I change the signing phrase?
 

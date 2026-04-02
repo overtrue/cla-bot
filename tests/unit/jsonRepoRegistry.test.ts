@@ -90,4 +90,61 @@ describe('JsonRepoRegistry', () => {
 
     await expect(registry.findSignature({ githubLogin: 'alice', claVersion: 'v1' })).rejects.toThrow();
   });
+
+  it('writes to a dedicated branch without touching the default branch', async () => {
+    const client = new MemoryGitHubClient();
+    const registry = new JsonRepoRegistry(
+      client,
+      repo,
+      'signatures',
+      'chore: record CLA signature for {{github_login}}',
+      'cla-signatures',
+    );
+
+    const saved = await registry.saveSignature(signature);
+
+    expect(client.getFile({ ...repo, path: 'signatures/individual/alice.json' })).toBeUndefined();
+    expect(client.getFile({ ...repo, path: 'signatures/individual/alice.json', ref: 'cla-signatures' })).toBeDefined();
+    expect(saved.registryUrl).toBe('https://github.com/overtrue/cla-registry/blob/cla-signatures/signatures/individual/alice.json');
+  });
+
+  it('reads existing signatures from the configured branch', async () => {
+    const client = new MemoryGitHubClient();
+    const registry = new JsonRepoRegistry(
+      client,
+      repo,
+      'signatures',
+      'chore: record CLA signature for {{github_login}}',
+      'cla-signatures',
+    );
+
+    await client.ensureBranch({ ...repo, branch: 'cla-signatures' });
+    client.seedFile({
+      ...repo,
+      ref: 'cla-signatures',
+      path: 'signatures/individual/alice.json',
+      content: JSON.stringify(
+        {
+          github_login: 'alice',
+          signer_type: 'individual',
+          signatures: [
+            {
+              cla_version: 'v1',
+              signed_at: '2026-04-02T10:00:00Z',
+              document_url: 'https://example.com/cla/v1',
+              source_repo: 'app/demo',
+              source_pr_number: 1,
+              source_comment_id: 11,
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    });
+
+    const found = await registry.findSignature({ githubLogin: 'alice', claVersion: 'v1' });
+    expect(found?.githubLogin).toBe('alice');
+    expect(found?.claVersion).toBe('v1');
+  });
 });

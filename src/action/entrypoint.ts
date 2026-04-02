@@ -28,7 +28,9 @@ export async function run(): Promise<void> {
     throw new Error('github-token input is required');
   }
 
-  const registryToken = core.getInput('registry-token') || process.env.REGISTRY_GITHUB_TOKEN || token;
+  const explicitRegistryToken = core.getInput('registry-token') || process.env.REGISTRY_GITHUB_TOKEN;
+  const registryToken = explicitRegistryToken || token;
+  const hasExplicitRegistryToken = Boolean(explicitRegistryToken);
   const client = createGitHubClient(token);
   const registryClient = createGitHubClient(registryToken);
   const owner = getRepositoryOwner();
@@ -47,6 +49,7 @@ export async function run(): Promise<void> {
         owner,
         repo,
         pullNumber: pullRequest.number,
+        hasExplicitRegistryToken,
       });
       return;
     }
@@ -67,6 +70,7 @@ export async function run(): Promise<void> {
         owner,
         repo,
         pullNumber: issue.number,
+        hasExplicitRegistryToken,
         comment: {
           id: comment.id,
           body: comment.body ?? '',

@@ -89,6 +89,15 @@ const rawConfigSchema = z.object({
     type: z.enum(['issue', 'json-repo']),
     repository: z.string().regex(/^[^/]+\/[^/]+$/, 'registry.repository must be owner/repo'),
     path_prefix: z.string().min(1).default('signatures'),
+    branch: z.string().min(1).optional(),
+  }).superRefine((value, ctx) => {
+    if (value.type === 'issue' && value.branch) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['branch'],
+        message: 'registry.branch is only supported for json-repo',
+      });
+    }
   }),
   status: z
     .object({
@@ -157,6 +166,7 @@ export function parseClaConfig(raw: string): ClaConfig {
         type: parsed.registry.type,
         repository: parsed.registry.repository,
         pathPrefix: parsed.registry.path_prefix,
+        ...(parsed.registry.branch ? { branch: parsed.registry.branch } : {}),
       },
       status: {
         checkName: parsed.status.check_name,

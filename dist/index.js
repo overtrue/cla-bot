@@ -62,7 +62,9 @@ async function run() {
     if (!token) {
         throw new Error('github-token input is required');
     }
-    const registryToken = core.getInput('registry-token') || process.env.REGISTRY_GITHUB_TOKEN || token;
+    const explicitRegistryToken = core.getInput('registry-token') || process.env.REGISTRY_GITHUB_TOKEN;
+    const registryToken = explicitRegistryToken || token;
+    const hasExplicitRegistryToken = Boolean(explicitRegistryToken);
     const client = (0, client_1.createGitHubClient)(token);
     const registryClient = (0, client_1.createGitHubClient)(registryToken);
     const owner = getRepositoryOwner();
@@ -78,6 +80,7 @@ async function run() {
                 owner,
                 repo,
                 pullNumber: pullRequest.number,
+                hasExplicitRegistryToken,
             });
             return;
         }
@@ -94,6 +97,7 @@ async function run() {
                 owner,
                 repo,
                 pullNumber: issue.number,
+                hasExplicitRegistryToken,
                 comment: {
                     id: comment.id,
                     body: comment.body ?? '',
@@ -112,12 +116,46 @@ async function run() {
 /***/ }),
 
 /***/ 3399:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.handleIssueComment = handleIssueComment;
+const core = __importStar(__nccwpck_require__(6966));
 const signatureMatcher_1 = __nccwpck_require__(8471);
 const config_1 = __nccwpck_require__(500);
 const engine_1 = __nccwpck_require__(2184);
@@ -125,6 +163,7 @@ const logger_1 = __nccwpck_require__(5006);
 const statusReporter_1 = __nccwpck_require__(9645);
 const createRegistry_1 = __nccwpck_require__(7197);
 const githubLogin_1 = __nccwpck_require__(3344);
+const registryGuidance_1 = __nccwpck_require__(5368);
 function applySavedSignature(evaluation, signer, signature) {
     const results = evaluation.results.map(result => {
         if (result.contributor.githubLogin !== signer) {
@@ -152,14 +191,32 @@ async function handleIssueComment(client, registryClient, input) {
     if (!config.enabled || !(0, signatureMatcher_1.matchesSignatureComment)(input.comment.body, config)) {
         return;
     }
+    for (const warning of (0, registryGuidance_1.getRegistrySetupWarnings)({
+        currentRepo: { owner: input.owner, repo: input.repo },
+        config,
+        hasExplicitRegistryToken: input.hasExplicitRegistryToken,
+    })) {
+        core.warning(warning);
+    }
     const reporter = new statusReporter_1.GitHubStatusReporter(client);
     const registry = (0, createRegistry_1.createRegistry)(registryClient, config);
-    const evaluation = await (0, engine_1.evaluatePullRequest)({
-        client,
-        pullRequest,
-        config,
-        registry,
-    });
+    let evaluation;
+    try {
+        evaluation = await (0, engine_1.evaluatePullRequest)({
+            client,
+            pullRequest,
+            config,
+            registry,
+        });
+    }
+    catch (error) {
+        throw (0, registryGuidance_1.toRegistryAccessError)(error, {
+            currentRepo: { owner: input.owner, repo: input.repo },
+            config,
+            hasExplicitRegistryToken: input.hasExplicitRegistryToken,
+            operation: 'read',
+        });
+    }
     const signer = input.comment.userLogin ? (0, githubLogin_1.normalizeGitHubLogin)(input.comment.userLogin) : null;
     if (!signer || !evaluation.missing.some(contributor => contributor.githubLogin === signer)) {
         (0, logger_1.logFields)({
@@ -172,18 +229,29 @@ async function handleIssueComment(client, registryClient, input) {
         });
         return;
     }
-    const savedSignature = await registry.saveSignature({
-        githubLogin: signer,
-        signerType: 'individual',
-        claVersion: evaluation.cla.version,
-        documentUrl: evaluation.cla.url,
-        ...(evaluation.cla.sha256 ? { documentSha256: evaluation.cla.sha256 } : {}),
-        signedAt: input.comment.createdAt ?? new Date().toISOString(),
-        sourceRepo: `${input.owner}/${input.repo}`,
-        sourcePrNumber: input.pullNumber,
-        sourceCommentId: input.comment.id,
-        registryType: config.registry.type,
-    });
+    let savedSignature;
+    try {
+        savedSignature = await registry.saveSignature({
+            githubLogin: signer,
+            signerType: 'individual',
+            claVersion: evaluation.cla.version,
+            documentUrl: evaluation.cla.url,
+            ...(evaluation.cla.sha256 ? { documentSha256: evaluation.cla.sha256 } : {}),
+            signedAt: input.comment.createdAt ?? new Date().toISOString(),
+            sourceRepo: `${input.owner}/${input.repo}`,
+            sourcePrNumber: input.pullNumber,
+            sourceCommentId: input.comment.id,
+            registryType: config.registry.type,
+        });
+    }
+    catch (error) {
+        throw (0, registryGuidance_1.toRegistryAccessError)(error, {
+            currentRepo: { owner: input.owner, repo: input.repo },
+            config,
+            hasExplicitRegistryToken: input.hasExplicitRegistryToken,
+            operation: 'write',
+        });
+    }
     const nextEvaluation = applySavedSignature(evaluation, signer, savedSignature);
     (0, logger_1.logFields)({
         event: 'issue_comment',
@@ -206,17 +274,52 @@ async function handleIssueComment(client, registryClient, input) {
 /***/ }),
 
 /***/ 4950:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.handlePullRequestTarget = handlePullRequestTarget;
+const core = __importStar(__nccwpck_require__(6966));
 const engine_1 = __nccwpck_require__(2184);
 const config_1 = __nccwpck_require__(500);
 const logger_1 = __nccwpck_require__(5006);
 const statusReporter_1 = __nccwpck_require__(9645);
 const createRegistry_1 = __nccwpck_require__(7197);
+const registryGuidance_1 = __nccwpck_require__(5368);
 async function handlePullRequestTarget(client, registryClient, input) {
     const pullRequest = await client.getPullRequest(input);
     const config = await (0, config_1.loadClaConfig)(client, {
@@ -235,12 +338,30 @@ async function handlePullRequestTarget(client, registryClient, input) {
         await reporter.reportDisabled({ pullRequest, config });
         return;
     }
-    const evaluation = await (0, engine_1.evaluatePullRequest)({
-        client,
-        pullRequest,
+    for (const warning of (0, registryGuidance_1.getRegistrySetupWarnings)({
+        currentRepo: { owner: input.owner, repo: input.repo },
         config,
-        registry: (0, createRegistry_1.createRegistry)(registryClient, config),
-    });
+        hasExplicitRegistryToken: input.hasExplicitRegistryToken,
+    })) {
+        core.warning(warning);
+    }
+    let evaluation;
+    try {
+        evaluation = await (0, engine_1.evaluatePullRequest)({
+            client,
+            pullRequest,
+            config,
+            registry: (0, createRegistry_1.createRegistry)(registryClient, config),
+        });
+    }
+    catch (error) {
+        throw (0, registryGuidance_1.toRegistryAccessError)(error, {
+            currentRepo: { owner: input.owner, repo: input.repo },
+            config,
+            hasExplicitRegistryToken: input.hasExplicitRegistryToken,
+            operation: 'read',
+        });
+    }
     (0, logger_1.logFields)({
         event: 'pull_request_target',
         repo: `${input.owner}/${input.repo}`,
@@ -256,6 +377,73 @@ async function handlePullRequestTarget(client, registryClient, input) {
         config,
         evaluation,
     });
+}
+
+
+/***/ }),
+
+/***/ 5368:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getRegistrySetupWarnings = getRegistrySetupWarnings;
+exports.toRegistryAccessError = toRegistryAccessError;
+const client_1 = __nccwpck_require__(1745);
+const repository_1 = __nccwpck_require__(1426);
+function isCrossRepoRegistry(config, currentRepo) {
+    const registryRepo = (0, repository_1.parseRepository)(config.registry.repository);
+    return registryRepo.owner !== currentRepo.owner || registryRepo.repo !== currentRepo.repo;
+}
+function requiredRegistryPermission(config) {
+    return config.registry.type === 'issue' ? 'Issues: read and write' : 'Contents: read and write';
+}
+function getRegistrySetupWarnings(input) {
+    if (!isCrossRepoRegistry(input.config, input.currentRepo) || input.hasExplicitRegistryToken) {
+        return [];
+    }
+    return [
+        [
+            `registry.repository is set to ${input.config.registry.repository}, which is different from the current repository `,
+            `${input.currentRepo.owner}/${input.currentRepo.repo}.`,
+            ' `registry-token` was not provided, so CLA Bot is falling back to `github-token` for registry access.',
+            ' `github.token` usually cannot write to a different repository.',
+            ` Configure \`registry-token\` (or \`REGISTRY_GITHUB_TOKEN\`) with ${requiredRegistryPermission(input.config)} on `,
+            `${input.config.registry.repository}.`,
+        ].join(''),
+    ];
+}
+function toRegistryAccessError(error, input) {
+    const status = (0, client_1.getGitHubErrorStatus)(error);
+    if (status !== 403 && status !== 404) {
+        return error instanceof Error ? error : new Error(String(error));
+    }
+    const action = input.operation === 'read' ? 'read from' : 'write to';
+    const tokenHint = input.hasExplicitRegistryToken
+        ? [
+            ' The provided `registry-token` does not appear to have the required access.',
+            ` It needs ${requiredRegistryPermission(input.config)} on ${input.config.registry.repository}.`,
+        ].join('')
+        : isCrossRepoRegistry(input.config, input.currentRepo)
+            ? [
+                ' `registry-token` was not provided, so CLA Bot fell back to `github-token`.',
+                ' `github.token` usually cannot access a different repository.',
+                ` Set \`registry-token\` (or \`REGISTRY_GITHUB_TOKEN\`) to a PAT or GitHub App installation token with `,
+                `${requiredRegistryPermission(input.config)} on ${input.config.registry.repository}.`,
+            ].join('')
+            : [
+                ' Check the workflow token permissions for the current repository.',
+                ` This backend needs ${requiredRegistryPermission(input.config)}.`,
+            ].join('');
+    const backendHint = input.config.registry.type === 'json-repo'
+        ? ' `json-repo` records signatures in Git commits, and those commits are authored by the token identity, not by the signer who commented on the PR.'
+        : ' `issue` records signatures as issues/comments created by the token identity.';
+    return new Error([
+        `Unable to ${action} registry repository ${input.config.registry.repository} (GitHub API status ${status}).`,
+        tokenHint,
+        backendHint,
+    ].join(''));
 }
 
 
@@ -469,6 +657,15 @@ const rawConfigSchema = zod_1.z.object({
         type: zod_1.z.enum(['issue', 'json-repo']),
         repository: zod_1.z.string().regex(/^[^/]+\/[^/]+$/, 'registry.repository must be owner/repo'),
         path_prefix: zod_1.z.string().min(1).default('signatures'),
+        branch: zod_1.z.string().min(1).optional(),
+    }).superRefine((value, ctx) => {
+        if (value.type === 'issue' && value.branch) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['branch'],
+                message: 'registry.branch is only supported for json-repo',
+            });
+        }
     }),
     status: zod_1.z
         .object({
@@ -536,6 +733,7 @@ function parseClaConfig(raw) {
                 type: parsed.registry.type,
                 repository: parsed.registry.repository,
                 pathPrefix: parsed.registry.path_prefix,
+                ...(parsed.registry.branch ? { branch: parsed.registry.branch } : {}),
             },
             status: {
                 checkName: parsed.status.check_name,
@@ -707,10 +905,17 @@ function logFields(fields) {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OctokitGitHubClient = void 0;
+exports.getGitHubErrorStatus = getGitHubErrorStatus;
 exports.createGitHubClient = createGitHubClient;
 const github_1 = __nccwpck_require__(4903);
 function isNotFound(error) {
-    return typeof error === 'object' && error !== null && 'status' in error && error.status === 404;
+    return getGitHubErrorStatus(error) === 404;
+}
+function getGitHubErrorStatus(error) {
+    if (typeof error !== 'object' || error === null || !('status' in error)) {
+        return null;
+    }
+    return typeof error.status === 'number' ? error.status : null;
 }
 function decodeContent(content) {
     return Buffer.from(content, 'base64').toString('utf8');
@@ -760,12 +965,51 @@ class OctokitGitHubClient {
             message: input.message,
             content: Buffer.from(input.content, 'utf8').toString('base64'),
             ...(input.sha ? { sha: input.sha } : {}),
+            ...(input.branch ? { branch: input.branch } : {}),
         });
         return {
             content: input.content,
             sha: response.data.content?.sha ?? input.sha ?? 'written-file',
             ...(response.data.content?.html_url ? { htmlUrl: response.data.content.html_url } : {}),
         };
+    }
+    async ensureBranch(input) {
+        try {
+            await this.octokit.rest.repos.getBranch({
+                owner: input.owner,
+                repo: input.repo,
+                branch: input.branch,
+            });
+            return;
+        }
+        catch (error) {
+            if (!isNotFound(error)) {
+                throw error;
+            }
+        }
+        const repo = await this.octokit.rest.repos.get({
+            owner: input.owner,
+            repo: input.repo,
+        });
+        const baseBranch = await this.octokit.rest.repos.getBranch({
+            owner: input.owner,
+            repo: input.repo,
+            branch: repo.data.default_branch,
+        });
+        try {
+            await this.octokit.rest.git.createRef({
+                owner: input.owner,
+                repo: input.repo,
+                ref: `refs/heads/${input.branch}`,
+                sha: baseBranch.data.commit.sha,
+            });
+        }
+        catch (error) {
+            if (getGitHubErrorStatus(error) === 422) {
+                return;
+            }
+            throw error;
+        }
     }
     async getPullRequest(input) {
         const response = await this.octokit.rest.pulls.get({
@@ -1076,7 +1320,7 @@ function createRegistry(client, config) {
     if (config.registry.type === 'issue') {
         return new issueRegistry_1.IssueRegistry(client, registryRepo);
     }
-    return new jsonRepoRegistry_1.JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.templates.registry.commitMessage);
+    return new jsonRepoRegistry_1.JsonRepoRegistry(client, registryRepo, config.registry.pathPrefix, config.templates.registry.commitMessage, config.registry.branch);
 }
 
 
@@ -1290,11 +1534,13 @@ class JsonRepoRegistry {
     registryRepo;
     pathPrefix;
     commitMessageTemplate;
-    constructor(client, registryRepo, pathPrefix, commitMessageTemplate) {
+    branch;
+    constructor(client, registryRepo, pathPrefix, commitMessageTemplate, branch) {
         this.client = client;
         this.registryRepo = registryRepo;
         this.pathPrefix = pathPrefix;
         this.commitMessageTemplate = commitMessageTemplate;
+        this.branch = branch;
     }
     async findSignature(input) {
         const file = await this.loadFile(input.githubLogin, 'individual');
@@ -1305,12 +1551,20 @@ class JsonRepoRegistry {
         return match ? fromJsonSignature(file.github_login, file.signer_type, match, file.registryUrl) : null;
     }
     async saveSignature(record) {
+        if (this.branch) {
+            await this.client.ensureBranch({
+                owner: this.registryRepo.owner,
+                repo: this.registryRepo.repo,
+                branch: this.branch,
+            });
+        }
         const path = this.pathFor(record.githubLogin, record.signerType);
         const message = this.commitMessageFor(record, path);
         const existing = await this.client.readFile({
             owner: this.registryRepo.owner,
             repo: this.registryRepo.repo,
             path,
+            ...(this.branch ? { ref: this.branch } : {}),
         });
         if (!existing) {
             const file = await this.client.writeFile({
@@ -1323,6 +1577,7 @@ class JsonRepoRegistry {
                     signer_type: record.signerType,
                     signatures: [toJsonSignature(record)],
                 }),
+                ...(this.branch ? { branch: this.branch } : {}),
             });
             return file.htmlUrl ? { ...record, registryUrl: file.htmlUrl } : record;
         }
@@ -1339,6 +1594,7 @@ class JsonRepoRegistry {
             sha: existing.sha,
             message,
             content: stringify(parsed),
+            ...(this.branch ? { branch: this.branch } : {}),
         });
         return file.htmlUrl ? { ...record, registryUrl: file.htmlUrl } : record;
     }
@@ -1347,6 +1603,7 @@ class JsonRepoRegistry {
             owner: this.registryRepo.owner,
             repo: this.registryRepo.repo,
             path: this.pathFor(login, signerType),
+            ...(this.branch ? { ref: this.branch } : {}),
         });
         return file
             ? {

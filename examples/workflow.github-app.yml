@@ -17,9 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Create token for registry repo
+        id: registry-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.CLA_BOT_APP_ID }}
+          private-key: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY }}
+          owner: overtrue
+          repositories: cla-registry
+          permission-issues: write
       - name: Run CLA Bot
         uses: overtrue/cla-bot@v0.0.1
         with:
           github-token: ${{ github.token }}
-          # PAT or GitHub App token with write access to the registry repository.
-          registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
+          registry-token: ${{ steps.registry-token.outputs.token }}

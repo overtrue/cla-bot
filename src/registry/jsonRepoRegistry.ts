@@ -66,6 +66,7 @@ export class JsonRepoRegistry implements SignatureRegistry {
     private readonly registryRepo: RepoCoordinates,
     private readonly pathPrefix: string,
     private readonly commitMessageTemplate: string,
+    private readonly branch?: string,
   ) {}
 
   async findSignature(input: { githubLogin: string; claVersion: string }): Promise<SignatureRecord | null> {
@@ -80,12 +81,21 @@ export class JsonRepoRegistry implements SignatureRegistry {
   }
 
   async saveSignature(record: SignatureRecord): Promise<SignatureRecord> {
+    if (this.branch) {
+      await this.client.ensureBranch({
+        owner: this.registryRepo.owner,
+        repo: this.registryRepo.repo,
+        branch: this.branch,
+      });
+    }
+
     const path = this.pathFor(record.githubLogin, record.signerType);
     const message = this.commitMessageFor(record, path);
     const existing = await this.client.readFile({
       owner: this.registryRepo.owner,
       repo: this.registryRepo.repo,
       path,
+      ...(this.branch ? { ref: this.branch } : {}),
     });
 
     if (!existing) {
@@ -99,6 +109,7 @@ export class JsonRepoRegistry implements SignatureRegistry {
           signer_type: record.signerType,
           signatures: [toJsonSignature(record)],
         }),
+        ...(this.branch ? { branch: this.branch } : {}),
       });
 
       return file.htmlUrl ? { ...record, registryUrl: file.htmlUrl } : record;
@@ -120,6 +131,7 @@ export class JsonRepoRegistry implements SignatureRegistry {
       sha: existing.sha,
       message,
       content: stringify(parsed),
+      ...(this.branch ? { branch: this.branch } : {}),
     });
 
     return file.htmlUrl ? { ...record, registryUrl: file.htmlUrl } : record;
@@ -130,6 +142,7 @@ export class JsonRepoRegistry implements SignatureRegistry {
       owner: this.registryRepo.owner,
       repo: this.registryRepo.repo,
       path: this.pathFor(login, signerType),
+      ...(this.branch ? { ref: this.branch } : {}),
     });
 
     return file

@@ -20,7 +20,8 @@ export type IssueSnapshot = {
 
 export interface GitHubClient {
   readFile(input: RepoCoordinates & { path: string; ref?: string }): Promise<RepoFile | null>;
-  writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<RepoFile>;
+  writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string; branch?: string }): Promise<RepoFile>;
+  ensureBranch(input: RepoCoordinates & { branch: string }): Promise<void>;
   getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot>;
   listPullRequestCommits(input: PullRequestRef): Promise<PullCommit[]>;
   listIssueComments(input: IssueRef): Promise<IssueCommentSnapshot[]>;
@@ -41,7 +42,15 @@ export interface GitHubClient {
 type Octokit = ReturnType<typeof getOctokit>;
 
 function isNotFound(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'status' in error && error.status === 404;
+  return getGitHubErrorStatus(error) === 404;
+}
+
+export function getGitHubErrorStatus(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null || !('status' in error)) {
+    return null;
+  }
+
+  return typeof error.status === 'number' ? error.status : null;
 }
 
 function decodeContent(content: string): string {
@@ -94,7 +103,13 @@ export class OctokitGitHubClient implements GitHubClient {
     }
   }
 
-  async writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<RepoFile> {
+  async writeFile(input: RepoCoordinates & {
+    path: string;
+    content: string;
+    message: string;
+    sha?: string;
+    branch?: string;
+  }): Promise<RepoFile> {
     const response = await this.octokit.rest.repos.createOrUpdateFileContents({
       owner: input.owner,
       repo: input.repo,
@@ -102,6 +117,7 @@ export class OctokitGitHubClient implements GitHubClient {
       message: input.message,
       content: Buffer.from(input.content, 'utf8').toString('base64'),
       ...(input.sha ? { sha: input.sha } : {}),
+      ...(input.branch ? { branch: input.branch } : {}),
     });
 
     return {
@@ -109,6 +125,46 @@ export class OctokitGitHubClient implements GitHubClient {
       sha: response.data.content?.sha ?? input.sha ?? 'written-file',
       ...(response.data.content?.html_url ? { htmlUrl: response.data.content.html_url } : {}),
     };
+  }
+
+  async ensureBranch(input: RepoCoordinates & { branch: string }): Promise<void> {
+    try {
+      await this.octokit.rest.repos.getBranch({
+        owner: input.owner,
+        repo: input.repo,
+        branch: input.branch,
+      });
+      return;
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw error;
+      }
+    }
+
+    const repo = await this.octokit.rest.repos.get({
+      owner: input.owner,
+      repo: input.repo,
+    });
+    const baseBranch = await this.octokit.rest.repos.getBranch({
+      owner: input.owner,
+      repo: input.repo,
+      branch: repo.data.default_branch,
+    });
+
+    try {
+      await this.octokit.rest.git.createRef({
+        owner: input.owner,
+        repo: input.repo,
+        ref: `refs/heads/${input.branch}`,
+        sha: baseBranch.data.commit.sha,
+      });
+    } catch (error) {
+      if (getGitHubErrorStatus(error) === 422) {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   async getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot> {
