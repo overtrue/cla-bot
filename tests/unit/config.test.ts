@@ -12,7 +12,7 @@ describe('parseClaConfig', () => {
       '  url: https://example.com/cla/v1',
       'registry:',
       '  type: issue',
-      '  repository: org/cla-registry',
+      '  repository: overtrue/cla-registry',
       '',
     ].join('\n'));
 
@@ -28,7 +28,7 @@ describe('parseClaConfig', () => {
         'enabled: true',
         'registry:',
         '  type: issue',
-        '  repository: org/cla-registry',
+        '  repository: overtrue/cla-registry',
         '',
       ].join('\n')),
     ).toThrow(/Invalid \.github\/cla\.yml/);

@@ -50,7 +50,7 @@ describe('CLA action flow', () => {
     });
 
     const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
-    const registryIssue = client.getIssueByTitle({ owner: 'org', repo: 'cla-registry', title: 'CLA - alice' });
+    const registryIssue = client.getIssueByTitle({ owner: 'overtrue', repo: 'cla-registry', title: 'CLA - alice' });
     const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
 
     expect(check?.conclusion).toBe('success');

@@ -21,7 +21,7 @@ contributors:
 
 registry:
   type: json-repo
-  repository: your-org/cla-registry
+  repository: overtrue/cla-registry
   path_prefix: signatures
 
 status:

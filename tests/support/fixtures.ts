@@ -36,7 +36,7 @@ export function claConfigYaml(input?: {
     '',
     'registry:',
     `  type: ${input?.registryType ?? 'issue'}`,
-    `  repository: ${input?.repository ?? 'org/cla-registry'}`,
+    `  repository: ${input?.repository ?? 'overtrue/cla-registry'}`,
     ...(input?.registryType === 'json-repo' || input?.pathPrefix
       ? [`  path_prefix: ${input?.pathPrefix ?? 'signatures'}`]
       : []),

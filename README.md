@@ -4,7 +4,7 @@ GitHub Action that blocks pull requests until each required contributor signs yo
 
 ## Quick Start
 
-1. Create a registry repository, for example `your-org/cla-registry`.
+1. Create a registry repository, for example `overtrue/cla-registry`.
 2. Add `.github/cla.yml` to the target repository.
 3. Add `.github/workflows/cla.yml` to the target repository.
 4. If the registry repository is different from the target repository, add a secret named `CLA_BOT_REGISTRY_TOKEN`.
@@ -36,7 +36,7 @@ document:
 
 registry:
   type: issue
-  repository: your-org/cla-registry
+  repository: overtrue/cla-registry
 ```
 
 Everything else falls back to sensible defaults.
@@ -67,7 +67,7 @@ contributors:
 
 registry:
   type: issue
-  repository: your-org/cla-registry
+  repository: overtrue/cla-registry
 
 status:
   check_name: CLA Check
@@ -104,7 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: your-org/cla-bot@v1
+        uses: overtrue/cla-bot@v0.0.1
         with:
           github-token: ${{ github.token }}
           registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
@@ -133,7 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: your-org/cla-bot@v1
+        uses: overtrue/cla-bot@v0.0.1
         with:
           github-token: ${{ github.token }}
 ```
@@ -165,7 +165,7 @@ Use `issue` if you want the simplest setup and easy manual inspection.
 ```yaml
 registry:
   type: issue
-  repository: your-org/cla-registry
+  repository: overtrue/cla-registry
 ```
 
 Use `json-repo` if you want one JSON file per signer.
@@ -173,7 +173,7 @@ Use `json-repo` if you want one JSON file per signer.
 ```yaml
 registry:
   type: json-repo
-  repository: your-org/cla-registry
+  repository: overtrue/cla-registry
   path_prefix: signatures
 ```
 
@@ -200,7 +200,7 @@ If you want an AI coding tool to integrate CLA Bot for you, give it this prompt 
 Integrate CLA Bot into this repository.
 
 Requirements:
-- Create or use the registry repository: your-org/cla-registry
+- Create or use the registry repository: overtrue/cla-registry
 - Use the issue backend
 - Add .github/cla.yml with the minimal working config
 - Add .github/workflows/cla.yml for pull_request_target and issue_comment

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { JsonRepoRegistry } from '../../src/registry/jsonRepoRegistry';
 import { MemoryGitHubClient } from '../support/memoryGitHubClient';
 
-const repo = { owner: 'org', repo: 'cla-registry' };
+const repo = { owner: 'overtrue', repo: 'cla-registry' };
 
 const signature = {
   githubLogin: 'alice',
