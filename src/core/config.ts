@@ -6,6 +6,50 @@ import type { ClaConfig, RepoCoordinates } from './types';
 import type { GitHubClient } from '../github/client';
 import { normalizeGitHubLogin } from '../utils/githubLogin';
 
+const defaultRawTemplates = {
+  registry: {
+    commit_message: 'chore: record CLA signature for {{github_login}}',
+  },
+  pr: {
+    missing_comment: [
+      'This pull request requires CLA signatures before it can be merged.',
+      '',
+      'Missing signatures:',
+      '',
+      '{{missing_contributors_markdown}}',
+      '',
+      'To sign the CLA, each missing contributor must comment exactly:',
+      '',
+      '`{{signing_comment_pattern}}`',
+      '',
+      'CLA document:',
+      '<{{cla_document_url}}>',
+    ].join('\n'),
+    success_comment: 'CLA requirements are satisfied for this pull request.',
+  },
+  check: {
+    success_title: 'CLA satisfied',
+    success_summary: [
+      'All required contributors have signed {{cla_version}}.',
+      '',
+      'Contributors checked:',
+      '',
+      '{{contributors_markdown}}',
+    ].join('\n'),
+    failure_title: 'CLA signatures required',
+    failure_summary: [
+      'The following contributors still need to sign {{cla_version}}:',
+      '',
+      '{{missing_contributors_markdown}}',
+      '',
+      'Required comment: `{{signing_comment_pattern}}`',
+      'Document: <{{cla_document_url}}>',
+    ].join('\n'),
+    disabled_title: 'CLA disabled',
+    disabled_summary: 'CLA enforcement is disabled for this repository.',
+  },
+} as const;
+
 const rawConfigSchema = z.object({
   enabled: z.boolean().default(true),
   document: z.object({
@@ -55,6 +99,35 @@ const rawConfigSchema = z.object({
       check_name: 'CLA Check',
       comment_tag: '<!-- cla-bot -->',
     }),
+  templates: z
+    .object({
+      registry: z
+        .object({
+          commit_message: z.string().min(1).default(defaultRawTemplates.registry.commit_message),
+        })
+        .default(defaultRawTemplates.registry),
+      pr: z
+        .object({
+          missing_comment: z.string().min(1).default(defaultRawTemplates.pr.missing_comment),
+          success_comment: z.string().min(1).default(defaultRawTemplates.pr.success_comment),
+        })
+        .default(defaultRawTemplates.pr),
+      check: z
+        .object({
+          success_title: z.string().min(1).default(defaultRawTemplates.check.success_title),
+          success_summary: z.string().min(1).default(defaultRawTemplates.check.success_summary),
+          failure_title: z.string().min(1).default(defaultRawTemplates.check.failure_title),
+          failure_summary: z.string().min(1).default(defaultRawTemplates.check.failure_summary),
+          disabled_title: z.string().min(1).default(defaultRawTemplates.check.disabled_title),
+          disabled_summary: z.string().min(1).default(defaultRawTemplates.check.disabled_summary),
+        })
+        .default(defaultRawTemplates.check),
+    })
+    .default({
+      registry: defaultRawTemplates.registry,
+      pr: defaultRawTemplates.pr,
+      check: defaultRawTemplates.check,
+    }),
 });
 
 export function parseClaConfig(raw: string): ClaConfig {
@@ -88,6 +161,23 @@ export function parseClaConfig(raw: string): ClaConfig {
       status: {
         checkName: parsed.status.check_name,
         commentTag: parsed.status.comment_tag,
+      },
+      templates: {
+        registry: {
+          commitMessage: parsed.templates.registry.commit_message,
+        },
+        pr: {
+          missingComment: parsed.templates.pr.missing_comment,
+          successComment: parsed.templates.pr.success_comment,
+        },
+        check: {
+          successTitle: parsed.templates.check.success_title,
+          successSummary: parsed.templates.check.success_summary,
+          failureTitle: parsed.templates.check.failure_title,
+          failureSummary: parsed.templates.check.failure_summary,
+          disabledTitle: parsed.templates.check.disabled_title,
+          disabledSummary: parsed.templates.check.disabled_summary,
+        },
       },
     };
   } catch (error) {

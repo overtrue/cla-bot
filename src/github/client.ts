@@ -15,11 +15,12 @@ export type IssueSnapshot = {
   number: number;
   title: string;
   body: string;
+  htmlUrl?: string;
 };
 
 export interface GitHubClient {
   readFile(input: RepoCoordinates & { path: string; ref?: string }): Promise<RepoFile | null>;
-  writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<void>;
+  writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<RepoFile>;
   getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot>;
   listPullRequestCommits(input: PullRequestRef): Promise<PullCommit[]>;
   listIssueComments(input: IssueRef): Promise<IssueCommentSnapshot[]>;
@@ -82,6 +83,7 @@ export class OctokitGitHubClient implements GitHubClient {
       return {
         content: decodeContent(response.data.content),
         sha: response.data.sha,
+        ...(response.data.html_url ? { htmlUrl: response.data.html_url } : {}),
       };
     } catch (error) {
       if (isNotFound(error)) {
@@ -92,8 +94,8 @@ export class OctokitGitHubClient implements GitHubClient {
     }
   }
 
-  async writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<void> {
-    await this.octokit.rest.repos.createOrUpdateFileContents({
+  async writeFile(input: RepoCoordinates & { path: string; content: string; message: string; sha?: string }): Promise<RepoFile> {
+    const response = await this.octokit.rest.repos.createOrUpdateFileContents({
       owner: input.owner,
       repo: input.repo,
       path: input.path,
@@ -101,6 +103,12 @@ export class OctokitGitHubClient implements GitHubClient {
       content: Buffer.from(input.content, 'utf8').toString('base64'),
       ...(input.sha ? { sha: input.sha } : {}),
     });
+
+    return {
+      content: input.content,
+      sha: response.data.content?.sha ?? input.sha ?? 'written-file',
+      ...(response.data.content?.html_url ? { htmlUrl: response.data.content.html_url } : {}),
+    };
   }
 
   async getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot> {
@@ -164,6 +172,7 @@ export class OctokitGitHubClient implements GitHubClient {
       number: match.number,
       title: match.title,
       body: match.body ?? '',
+      ...(match.html_url ? { htmlUrl: match.html_url } : {}),
     };
   }
 
@@ -180,6 +189,7 @@ export class OctokitGitHubClient implements GitHubClient {
       number: issue.data.number,
       title: issue.data.title,
       body: issue.data.body ?? '',
+      ...(issue.data.html_url ? { htmlUrl: issue.data.html_url } : {}),
     };
   }
 
@@ -196,6 +206,7 @@ export class OctokitGitHubClient implements GitHubClient {
       number: issue.data.number,
       title: issue.data.title,
       body: issue.data.body ?? '',
+      ...(issue.data.html_url ? { htmlUrl: issue.data.html_url } : {}),
     };
   }
 

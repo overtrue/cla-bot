@@ -58,6 +58,107 @@ describe('CLA action flow', () => {
     expect(prComment?.body).toContain('CLA requirements are satisfied');
   });
 
+  it('can render custom success templates with registry links', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({
+        registryType: 'json-repo',
+        templates: {
+          prSuccessComment: 'Signed by everyone.\n\n{{registry_links_markdown}}',
+          checkSuccessTitle: 'All signed',
+          checkSuccessSummary: 'Stored records:\n\n{{registry_links_markdown}}',
+        },
+      }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      comment: {
+        id: 100,
+        body: 'I have read and agree to the CLA.',
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
+
+    expect(check?.title).toBe('All signed');
+    expect(check?.summary).toContain('Stored records:');
+    expect(prComment?.body).toContain('Signed by everyone.');
+    expect(prComment?.body).toContain(
+      'https://github.com/overtrue/cla-registry/blob/main/signatures/individual/alice.json',
+    );
+  });
+
+  it('can render custom failure templates before anyone signs', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({
+        templates: {
+          prMissingComment: 'Still waiting on:\n\n{{missing_contributors_markdown}}',
+          checkFailureTitle: 'Needs signatures',
+          checkFailureSummary: 'Missing now:\n\n{{missing_contributors_markdown}}',
+        },
+      }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
+
+    expect(check?.title).toBe('Needs signatures');
+    expect(check?.summary).toContain('Missing now:');
+    expect(prComment?.body).toContain('Still waiting on:');
+    expect(prComment?.body).toContain('@alice');
+  });
+
+  it('can render custom success templates for the issue backend', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({
+        templates: {
+          prSuccessComment: 'Everyone signed.\n\n{{registry_links_markdown}}',
+        },
+      }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1 });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      comment: {
+        id: 100,
+        body: 'I have read and agree to the CLA.',
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const prComment = client.getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 }).at(-1);
+
+    expect(prComment?.body).toContain('Everyone signed.');
+    expect(prComment?.body).toContain('https://github.com/overtrue/cla-registry/issues/1');
+  });
+
   it('stays red when only part of the contributor set has signed', async () => {
     const client = new MemoryGitHubClient();
     client.seedFile({

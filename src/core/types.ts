@@ -26,6 +26,7 @@ export type SignatureRecord = {
   sourcePrNumber: number;
   sourceCommentId?: number;
   registryType: RegistryType;
+  registryUrl?: string;
 };
 
 export type SignatureCheckResult = {
@@ -59,6 +60,23 @@ export type ClaConfig = {
   status: {
     checkName: string;
     commentTag: string;
+  };
+  templates: {
+    registry: {
+      commitMessage: string;
+    };
+    pr: {
+      missingComment: string;
+      successComment: string;
+    };
+    check: {
+      successTitle: string;
+      successSummary: string;
+      failureTitle: string;
+      failureSummary: string;
+      disabledTitle: string;
+      disabledSummary: string;
+    };
   };
 };
 
@@ -97,6 +115,7 @@ export type IssueCommentSnapshot = {
 export type RepoFile = {
   content: string;
   sha: string;
+  htmlUrl?: string;
 };
 
 export type ClaEvaluation = {

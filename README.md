@@ -177,6 +177,74 @@ registry:
   path_prefix: signatures
 ```
 
+## Customize Templates
+
+Use `templates` if you want to customize commit messages, PR comments, or check output.
+
+Supported template keys:
+
+- `templates.registry.commit_message`
+- `templates.pr.missing_comment`
+- `templates.pr.success_comment`
+- `templates.check.success_title`
+- `templates.check.success_summary`
+- `templates.check.failure_title`
+- `templates.check.failure_summary`
+- `templates.check.disabled_title`
+- `templates.check.disabled_summary`
+
+```yaml
+templates:
+  registry:
+    commit_message: "chore: record CLA signature for {{github_login}} from {{source_repo}}#{{source_pr_number}}"
+  pr:
+    success_comment: |
+      CLA requirements are satisfied for this pull request.
+
+      Registry records:
+
+      {{registry_links_markdown}}
+  check:
+    success_summary: |
+      All required contributors have signed {{cla_version}}.
+
+      Contributors checked:
+
+      {{contributors_markdown}}
+
+      Registry records:
+
+      {{registry_links_markdown}}
+```
+
+`status.comment_tag` is still prepended automatically to PR comments. Templates should not include it.
+
+Available placeholders for `templates.registry.commit_message`:
+
+- `{{github_login}}`
+- `{{signer_type}}`
+- `{{cla_version}}`
+- `{{source_repo}}`
+- `{{source_pr_number}}`
+- `{{source_comment_id}}`
+- `{{registry_repository}}`
+- `{{registry_path}}`
+
+Available placeholders for `templates.pr.*` and `templates.check.*`:
+
+- `{{cla_version}}`
+- `{{cla_document_url}}`
+- `{{cla_document_sha256}}`
+- `{{signing_comment_pattern}}`
+- `{{contributors_markdown}}`
+- `{{missing_contributors_markdown}}`
+- `{{registry_links_markdown}}`
+- `{{contributors_count}}`
+- `{{missing_count}}`
+- `{{registry_link_count}}`
+
+`{{registry_links_markdown}}` works for both backends. For `json-repo`, the links point to the signer JSON file. For `issue`, the links point to the signer issue.
+
 ## Token Setup
 
 `github-token`

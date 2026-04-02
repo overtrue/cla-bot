@@ -112,6 +112,10 @@ function pickSignature(records: SignatureRecord[], claVersion: string): Signatur
   );
 }
 
+function withRegistryUrl(record: SignatureRecord, registryUrl?: string): SignatureRecord {
+  return registryUrl ? { ...record, registryUrl } : record;
+}
+
 export class IssueRegistry implements SignatureRegistry {
   constructor(
     private readonly client: GitHubClient,
@@ -130,7 +134,8 @@ export class IssueRegistry implements SignatureRegistry {
     }
 
     const records = await this.loadRecords(issue.number, issue.body);
-    return pickSignature(records, input.claVersion);
+    const match = pickSignature(records, input.claVersion);
+    return match ? withRegistryUrl(match, issue.htmlUrl) : null;
   }
 
   async saveSignature(record: SignatureRecord): Promise<SignatureRecord> {
@@ -157,17 +162,17 @@ export class IssueRegistry implements SignatureRegistry {
         body: toIssueComment(record),
       });
 
-      return record;
+      return withRegistryUrl(record, issue.htmlUrl);
     }
 
     const records = await this.loadRecords(existingIssue.number, existingIssue.body);
     const existing = pickSignature(records, record.claVersion);
 
     if (existing) {
-      return existing;
+      return withRegistryUrl(existing, existingIssue.htmlUrl);
     }
 
-    await this.client.updateIssue({
+    const updatedIssue = await this.client.updateIssue({
       owner: this.registryRepo.owner,
       repo: this.registryRepo.repo,
       issueNumber: existingIssue.number,
@@ -182,7 +187,7 @@ export class IssueRegistry implements SignatureRegistry {
       body: toIssueComment(record),
     });
 
-    return record;
+    return withRegistryUrl(record, updatedIssue.htmlUrl);
   }
 
   private async loadRecords(issueNumber: number, issueBody: string): Promise<SignatureRecord[]> {
