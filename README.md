@@ -192,6 +192,31 @@ registry:
 - Must have write access to the registry repository.
 - A fine-grained PAT is the simplest option.
 
+## Use with AI
+
+If you want an AI coding tool to integrate CLA Bot for you, give it this prompt and adjust the repository names:
+
+```text
+Integrate CLA Bot into this repository.
+
+Requirements:
+- Create or use the registry repository: your-org/cla-registry
+- Use the issue backend
+- Add .github/cla.yml with the minimal working config
+- Add .github/workflows/cla.yml for pull_request_target and issue_comment
+- Use github.token for github-token
+- Use CLA_BOT_REGISTRY_TOKEN as the secret for registry-token if the registry repository is separate
+- Keep the setup simple and do not add extra features
+- Update README or workflow comments only if needed to explain setup
+
+After the changes:
+- summarize what was added
+- list any required GitHub secrets
+- explain how contributors sign the CLA
+```
+
+For a same-repo registry, tell the AI to omit `registry-token` and point `registry.repository` at the current repository.
+
 ## Common Questions
 
 Why is the PR still blocked after someone signed?
