@@ -1,4 +1,4 @@
-name: CLA Bot
+name: CLA Bot - Easily handle Contributor License Agreements (CLAs)
 description: Lightweight GitHub CLA enforcement.
 inputs:
   github-token:
