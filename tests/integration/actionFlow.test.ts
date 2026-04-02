@@ -61,6 +61,70 @@ describe('CLA action flow', () => {
     expect(prComment?.body).toContain('CLA requirements are satisfied');
   });
 
+  it('turns green when the signer omits terminal punctuation', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml(),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      ...registryAccess,
+      comment: {
+        id: 100,
+        body: 'I have read and agree to the CLA',
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const registryIssue = client.getIssueByTitle({ owner: 'overtrue', repo: 'cla-registry', title: 'CLA - alice' });
+
+    expect(check?.conclusion).toBe('success');
+    expect(registryIssue).toBeDefined();
+  });
+
+  it('stays red when terminal punctuation is required by config', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({
+        ignoreTerminalPunctuation: false,
+      }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      ...registryAccess,
+      comment: {
+        id: 100,
+        body: 'I have read and agree to the CLA',
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const registryIssue = client.getIssueByTitle({ owner: 'overtrue', repo: 'cla-registry', title: 'CLA - alice' });
+
+    expect(check?.conclusion).toBe('failure');
+    expect(registryIssue).toBeUndefined();
+  });
+
   it('can render custom success templates with registry links', async () => {
     const client = new MemoryGitHubClient();
     client.seedFile({

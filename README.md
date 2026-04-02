@@ -1,6 +1,6 @@
 # CLA Bot
 
-GitHub Action that blocks pull requests until each required contributor signs your CLA by posting an exact PR comment.
+GitHub Action that blocks pull requests until each required contributor signs your CLA by posting a matching PR comment.
 
 If you build or test this repository locally, use Node 24.
 
@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.1
+        uses: overtrue/cla-bot@v0.0.4
         with:
           github-token: ${{ github.token }}
 ```
@@ -77,7 +77,7 @@ flowchart LR
   A["Pull request opened"] --> B["CLA Check runs"]
   B --> C{"All required contributors signed?"}
   C -->|No| D["Bot posts signing instructions"]
-  D --> E["Missing contributor comments exact CLA phrase"]
+  D --> E["Missing contributor comments matching CLA phrase"]
   E --> F["CLA Check runs again"]
   F --> C
   C -->|Yes| G["PR can be merged"]
@@ -87,7 +87,7 @@ flowchart LR
 
 When a PR is missing signatures, the bot posts a comment listing the missing contributors.
 
-Each missing contributor must comment exactly:
+Each missing contributor must comment:
 
 ```text
 I have read and agree to the CLA.
@@ -128,6 +128,7 @@ signing:
   comment_pattern: I have read and agree to the CLA.
   case_insensitive: true
   trim_whitespace: true
+  ignore_terminal_punctuation: true
 
 contributors:
   check_pr_author: true
@@ -215,7 +216,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.1
+        uses: overtrue/cla-bot@v0.0.4
         with:
           github-token: ${{ github.token }}
 ```
@@ -245,7 +246,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.1
+        uses: overtrue/cla-bot@v0.0.4
         with:
           github-token: ${{ github.token }}
           registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
@@ -320,7 +321,7 @@ Available placeholders for `templates.pr.*` and `templates.check.*`:
 | `{{cla_version}}` | CLA document version |
 | `{{cla_document_url}}` | CLA document URL |
 | `{{cla_document_sha256}}` | CLA document SHA-256, if configured |
-| `{{signing_comment_pattern}}` | Exact signing phrase contributors must post |
+| `{{signing_comment_pattern}}` | Signing phrase shown to contributors |
 | `{{contributors_markdown}}` | Checked contributors rendered as Markdown |
 | `{{missing_contributors_markdown}}` | Missing contributors rendered as Markdown |
 | `{{registry_links_markdown}}` | Registry record links rendered as Markdown |
@@ -404,7 +405,7 @@ Example for a cross-repo `issue` backend. Replace `your-org` and `your-cla-regis
     permission-issues: write
 
 - name: Run CLA Bot
-  uses: overtrue/cla-bot@v0.0.1
+  uses: overtrue/cla-bot@v0.0.4
   with:
     github-token: ${{ github.token }}
     registry-token: ${{ steps.registry-token.outputs.token }}
@@ -457,6 +458,7 @@ Why is the PR still blocked after someone signed?
 
 - Another required contributor is still missing.
 - The comment text does not match the configured signing phrase.
+- By default, case and surrounding whitespace are ignored, and terminal punctuation is optional.
 - The repository now requires a newer CLA version.
 
 Why was no signature record written?
@@ -469,7 +471,9 @@ Why was no signature record written?
 Can I change the signing phrase?
 
 - Yes. Set `signing.comment_pattern` in `.github/cla.yml`.
-- Contributors must match that phrase exactly, subject to your `case_insensitive` and `trim_whitespace` settings.
+- Contributors must match that phrase, subject to your `case_insensitive` and `trim_whitespace` settings.
+- Terminal punctuation at the end of the comment is ignored by default.
+- Set `signing.ignore_terminal_punctuation: false` if you want to require exact terminal punctuation.
 
 ## License
 

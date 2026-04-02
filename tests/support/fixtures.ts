@@ -9,6 +9,7 @@ export function claConfigYaml(input?: {
   allowlist?: string[];
   caseInsensitive?: boolean;
   trimWhitespace?: boolean;
+  ignoreTerminalPunctuation?: boolean;
   checkCommitAuthors?: boolean;
   templates?: {
     registryCommitMessage?: string;
@@ -87,6 +88,7 @@ export function claConfigYaml(input?: {
     '  comment_pattern: I have read and agree to the CLA.',
     `  case_insensitive: ${String(input?.caseInsensitive ?? true)}`,
     `  trim_whitespace: ${String(input?.trimWhitespace ?? true)}`,
+    `  ignore_terminal_punctuation: ${String(input?.ignoreTerminalPunctuation ?? true)}`,
     '',
     'contributors:',
     '  check_pr_author: true',

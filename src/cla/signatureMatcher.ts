@@ -1,5 +1,7 @@
 import type { ClaConfig } from '../core/types';
 
+const trailingSentencePunctuation = /[.!?,;:。！？，；：]+$/u;
+
 function normalize(input: string, config: ClaConfig): string {
   let value = input;
 
@@ -9,6 +11,10 @@ function normalize(input: string, config: ClaConfig): string {
 
   if (config.signing.caseInsensitive) {
     value = value.toLocaleLowerCase('en-US');
+  }
+
+  if (config.signing.ignoreTerminalPunctuation) {
+    value = value.replace(trailingSentencePunctuation, '');
   }
 
   return value;

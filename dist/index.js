@@ -470,6 +470,7 @@ function resolveClaDocument(config) {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.matchesSignatureComment = matchesSignatureComment;
+const trailingSentencePunctuation = /[.!?,;:。！？，；：]+$/u;
 function normalize(input, config) {
     let value = input;
     if (config.signing.trimWhitespace) {
@@ -477,6 +478,9 @@ function normalize(input, config) {
     }
     if (config.signing.caseInsensitive) {
         value = value.toLocaleLowerCase('en-US');
+    }
+    if (config.signing.ignoreTerminalPunctuation) {
+        value = value.replace(trailingSentencePunctuation, '');
     }
     return value;
 }
@@ -587,7 +591,7 @@ const defaultRawTemplates = {
             '',
             '{{missing_contributors_markdown}}',
             '',
-            'To sign the CLA, each missing contributor must comment exactly:',
+            'To sign the CLA, each missing contributor must comment this phrase:',
             '',
             '`{{signing_comment_pattern}}`',
             '',
@@ -611,7 +615,7 @@ const defaultRawTemplates = {
             '',
             '{{missing_contributors_markdown}}',
             '',
-            'Required comment: `{{signing_comment_pattern}}`',
+            'Required phrase: `{{signing_comment_pattern}}`',
             'Document: <{{cla_document_url}}>',
         ].join('\n'),
         disabled_title: 'CLA disabled',
@@ -631,12 +635,14 @@ const rawConfigSchema = zod_1.z.object({
         comment_pattern: zod_1.z.string().min(1).default('I have read and agree to the CLA.'),
         case_insensitive: zod_1.z.boolean().default(true),
         trim_whitespace: zod_1.z.boolean().default(true),
+        ignore_terminal_punctuation: zod_1.z.boolean().default(true),
     })
         .default({
         mode: 'comment',
         comment_pattern: 'I have read and agree to the CLA.',
         case_insensitive: true,
         trim_whitespace: true,
+        ignore_terminal_punctuation: true,
     }),
     contributors: zod_1.z
         .object({
@@ -721,6 +727,7 @@ function parseClaConfig(raw) {
                 commentPattern: parsed.signing.comment_pattern,
                 caseInsensitive: parsed.signing.case_insensitive,
                 trimWhitespace: parsed.signing.trim_whitespace,
+                ignoreTerminalPunctuation: parsed.signing.ignore_terminal_punctuation,
             },
             contributors: {
                 checkPrAuthor: parsed.contributors.check_pr_author,

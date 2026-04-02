@@ -18,7 +18,7 @@ const defaultRawTemplates = {
       '',
       '{{missing_contributors_markdown}}',
       '',
-      'To sign the CLA, each missing contributor must comment exactly:',
+      'To sign the CLA, each missing contributor must comment this phrase:',
       '',
       '`{{signing_comment_pattern}}`',
       '',
@@ -42,7 +42,7 @@ const defaultRawTemplates = {
       '',
       '{{missing_contributors_markdown}}',
       '',
-      'Required comment: `{{signing_comment_pattern}}`',
+      'Required phrase: `{{signing_comment_pattern}}`',
       'Document: <{{cla_document_url}}>',
     ].join('\n'),
     disabled_title: 'CLA disabled',
@@ -63,12 +63,14 @@ const rawConfigSchema = z.object({
       comment_pattern: z.string().min(1).default('I have read and agree to the CLA.'),
       case_insensitive: z.boolean().default(true),
       trim_whitespace: z.boolean().default(true),
+      ignore_terminal_punctuation: z.boolean().default(true),
     })
     .default({
       mode: 'comment',
       comment_pattern: 'I have read and agree to the CLA.',
       case_insensitive: true,
       trim_whitespace: true,
+      ignore_terminal_punctuation: true,
     }),
   contributors: z
     .object({
@@ -154,6 +156,7 @@ export function parseClaConfig(raw: string): ClaConfig {
         commentPattern: parsed.signing.comment_pattern,
         caseInsensitive: parsed.signing.case_insensitive,
         trimWhitespace: parsed.signing.trim_whitespace,
+        ignoreTerminalPunctuation: parsed.signing.ignore_terminal_punctuation,
       },
       contributors: {
         checkPrAuthor: parsed.contributors.check_pr_author,

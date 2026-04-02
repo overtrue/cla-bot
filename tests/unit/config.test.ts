@@ -17,6 +17,7 @@ describe('parseClaConfig', () => {
     ].join('\n'));
 
     expect(config.signing.commentPattern).toBe('I have read and agree to the CLA.');
+    expect(config.signing.ignoreTerminalPunctuation).toBe(true);
     expect(config.contributors.checkCommitAuthors).toBe(true);
     expect(config.registry.pathPrefix).toBe('signatures');
     expect(config.registry.branch).toBeUndefined();
@@ -62,6 +63,16 @@ describe('parseClaConfig', () => {
 
     expect(config.registry.type).toBe('json-repo');
     expect(config.registry.branch).toBe('cla-signatures');
+  });
+
+  it('parses signing.ignore_terminal_punctuation', () => {
+    const config = parseClaConfig(
+      claConfigYaml({
+        ignoreTerminalPunctuation: false,
+      }),
+    );
+
+    expect(config.signing.ignoreTerminalPunctuation).toBe(false);
   });
 
   it('fails on missing required fields', () => {

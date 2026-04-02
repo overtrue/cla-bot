@@ -44,6 +44,7 @@ export type ClaConfig = {
     commentPattern: string;
     caseInsensitive: boolean;
     trimWhitespace: boolean;
+    ignoreTerminalPunctuation: boolean;
   };
   contributors: {
     checkPrAuthor: boolean;

@@ -9,6 +9,7 @@ signing:
   comment_pattern: I have read and agree to the CLA.
   case_insensitive: true
   trim_whitespace: true
+  ignore_terminal_punctuation: true
 
 contributors:
   check_pr_author: true
