@@ -23,8 +23,8 @@ jobs:
         with:
           app-id: ${{ vars.CLA_BOT_APP_ID }}
           private-key: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY }}
-          owner: overtrue
-          repositories: cla-registry
+          owner: your-org
+          repositories: your-cla-registry
           permission-issues: write
       - name: Run CLA Bot
         uses: overtrue/cla-bot@v0.0.1

@@ -368,15 +368,15 @@ Users create and manage their own GitHub App. CLA Bot does not require a shared 
 
 Setup flow:
 
-1. Create a GitHub App for CLA Bot use.
+1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app) for CLA Bot use.
 2. Grant only the permissions needed by your chosen registry backend.
-3. Install the app on the registry repository.
+3. [Install the app](https://docs.github.com/en/developers/apps/managing-github-apps/installing-github-apps) on the registry repository.
 4. Download a private key for the app.
 5. Store the app ID as `CLA_BOT_APP_ID` in Actions variables.
 6. Store the private key as `CLA_BOT_APP_PRIVATE_KEY` in Actions secrets.
 7. In the workflow, use `actions/create-github-app-token@v3` to mint a short-lived installation token and pass it as `registry-token`.
 
-Example for a cross-repo `issue` backend:
+Example for a cross-repo `issue` backend. Replace `your-org` and `your-cla-registry` with your own registry repository:
 
 ```yaml
 - name: Create token for registry repo
@@ -385,8 +385,8 @@ Example for a cross-repo `issue` backend:
   with:
     app-id: ${{ vars.CLA_BOT_APP_ID }}
     private-key: ${{ secrets.CLA_BOT_APP_PRIVATE_KEY }}
-    owner: overtrue
-    repositories: cla-registry
+    owner: your-org
+    repositories: your-cla-registry
     permission-issues: write
 
 - name: Run CLA Bot
