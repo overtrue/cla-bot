@@ -12,6 +12,19 @@ GitHub Action that blocks pull requests until each required contributor signs yo
 
 If you build or test this repository locally, use Node 24.
 
+## How It Works
+
+```mermaid
+flowchart LR
+  A["Pull request opened"] --> B["CLA Check runs"]
+  B --> C{"All required contributors signed?"}
+  C -->|No| D["Bot posts signing instructions"]
+  D --> E["Missing contributor comments exact CLA phrase"]
+  E --> F["CLA Check runs again"]
+  F --> C
+  C -->|Yes| G["PR can be merged"]
+```
+
 ## Add `.github/cla.yml`
 
 Default setup using the issue backend:
@@ -182,3 +195,7 @@ Can I change the signing phrase?
 
 - Yes. Set `signing.comment_pattern` in `.github/cla.yml`.
 - Contributors must match that phrase exactly, subject to your `case_insensitive` and `trim_whitespace` settings.
+
+## License
+
+Licensed under the [MIT License](./LICENSE).
