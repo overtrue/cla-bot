@@ -21,7 +21,7 @@ contributors:
 
 registry:
   type: issue
-  repository: overtrue/your-repo
+  repository: your-org/your-repo
 
 status:
   check_name: CLA Check

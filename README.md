@@ -21,7 +21,7 @@ If you just want CLA enforcement to work with the least setup, start with same r
 
 ## Quick Start
 
-Replace `overtrue/your-repo` with the repository that runs the workflow.
+Replace `your-org/your-repo` with the repository that runs the workflow.
 
 Add `.github/cla.yml`:
 
@@ -32,7 +32,7 @@ document:
 
 registry:
   type: issue
-  repository: overtrue/your-repo
+  repository: your-org/your-repo
 ```
 
 Add `.github/workflows/cla.yml`:
@@ -109,7 +109,7 @@ document:
 
 registry:
   type: issue
-  repository: overtrue/your-repo
+  repository: your-org/your-repo
 ```
 
 Everything else falls back to sensible defaults.
@@ -140,7 +140,7 @@ contributors:
 
 registry:
   type: issue
-  repository: overtrue/your-repo
+  repository: your-org/your-repo
 
 status:
   check_name: CLA Check
@@ -156,7 +156,7 @@ Use `issue` if you want the simplest setup and easy manual inspection.
 ```yaml
 registry:
   type: issue
-  repository: overtrue/your-repo
+  repository: your-org/your-repo
 ```
 
 ### `json-repo`
@@ -166,7 +166,7 @@ Use `json-repo` if you want one JSON file per signer.
 ```yaml
 registry:
   type: json-repo
-  repository: overtrue/cla-registry
+  repository: your-org/your-cla-registry
   path_prefix: signatures
 ```
 
@@ -175,7 +175,7 @@ If you want `json-repo` in the same repository without polluting the default bra
 ```yaml
 registry:
   type: json-repo
-  repository: overtrue/your-repo
+  repository: your-org/your-repo
   path_prefix: signatures
   branch: cla-signatures
 ```
