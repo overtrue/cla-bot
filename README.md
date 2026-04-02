@@ -27,7 +27,21 @@ flowchart LR
 
 ## Add `.github/cla.yml`
 
-Default setup using the issue backend:
+The file does not need to be fully specified. This is the smallest useful config:
+
+```yaml
+document:
+  version: v1
+  url: https://example.com/cla/v1
+
+registry:
+  type: issue
+  repository: your-org/cla-registry
+```
+
+Everything else falls back to sensible defaults.
+
+Full example using the issue backend:
 
 ```yaml
 enabled: true
