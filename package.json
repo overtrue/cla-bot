@@ -4,7 +4,7 @@
   "private": true,
   "description": "Lightweight GitHub CLA enforcement bot.",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && ncc build .build/index.js -o dist",

@@ -10,6 +10,8 @@ GitHub Action that blocks pull requests until each required contributor signs yo
 4. If the registry repository is different from the target repository, add a secret named `CLA_BOT_REGISTRY_TOKEN`.
 5. Open a pull request. The bot will post signing instructions when a signature is missing.
 
+If you build or test this repository locally, use Node 24.
+
 ## Add `.github/cla.yml`
 
 Default setup using the issue backend:

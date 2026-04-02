@@ -8,5 +8,5 @@ inputs:
     description: Optional token for registry repository access. Defaults to github-token.
     required: false
 runs:
-  using: node20
+  using: node24
   main: dist/index.js
