@@ -1,5 +1,8 @@
 name: CLA Bot - Easily handle Contributor License Agreements (CLAs)
 description: Lightweight GitHub CLA enforcement.
+branding:
+  icon: 'user-check'
+  color: 'green'
 inputs:
   github-token:
     description: GitHub token for reading the target repository and writing PR comments/checks.
