@@ -262,15 +262,17 @@ Use `templates` if you want to customize commit messages, PR comments, or check 
 
 Supported template keys:
 
-- `templates.registry.commit_message`
-- `templates.pr.missing_comment`
-- `templates.pr.success_comment`
-- `templates.check.success_title`
-- `templates.check.success_summary`
-- `templates.check.failure_title`
-- `templates.check.failure_summary`
-- `templates.check.disabled_title`
-- `templates.check.disabled_summary`
+| Key | Used for | Typical content |
+| --- | --- | --- |
+| `templates.registry.commit_message` | `json-repo` commit message | One-line Git commit message |
+| `templates.pr.missing_comment` | PR comment when signatures are missing | Signing instructions and missing contributors |
+| `templates.pr.success_comment` | PR comment when everyone has signed | Success message and optional registry links |
+| `templates.check.success_title` | Success check title | Short status title |
+| `templates.check.success_summary` | Success check summary | Contributors and optional registry links |
+| `templates.check.failure_title` | Failure check title | Short status title |
+| `templates.check.failure_summary` | Failure check summary | Missing contributors and signing instructions |
+| `templates.check.disabled_title` | Disabled check title | Short status title |
+| `templates.check.disabled_summary` | Disabled check summary | Explanation that CLA enforcement is disabled |
 
 ```yaml
 templates:
@@ -300,27 +302,31 @@ templates:
 
 Available placeholders for `templates.registry.commit_message`:
 
-- `{{github_login}}`
-- `{{signer_type}}`
-- `{{cla_version}}`
-- `{{source_repo}}`
-- `{{source_pr_number}}`
-- `{{source_comment_id}}`
-- `{{registry_repository}}`
-- `{{registry_path}}`
+| Placeholder | Meaning |
+| --- | --- |
+| `{{github_login}}` | Signer GitHub login |
+| `{{signer_type}}` | Signer type such as `individual` |
+| `{{cla_version}}` | CLA document version |
+| `{{source_repo}}` | Source repository in `owner/repo` form |
+| `{{source_pr_number}}` | Source pull request number |
+| `{{source_comment_id}}` | Source signing comment ID |
+| `{{registry_repository}}` | Registry repository in `owner/repo` form |
+| `{{registry_path}}` | Path to the signer JSON file inside the registry |
 
 Available placeholders for `templates.pr.*` and `templates.check.*`:
 
-- `{{cla_version}}`
-- `{{cla_document_url}}`
-- `{{cla_document_sha256}}`
-- `{{signing_comment_pattern}}`
-- `{{contributors_markdown}}`
-- `{{missing_contributors_markdown}}`
-- `{{registry_links_markdown}}`
-- `{{contributors_count}}`
-- `{{missing_count}}`
-- `{{registry_link_count}}`
+| Placeholder | Meaning |
+| --- | --- |
+| `{{cla_version}}` | CLA document version |
+| `{{cla_document_url}}` | CLA document URL |
+| `{{cla_document_sha256}}` | CLA document SHA-256, if configured |
+| `{{signing_comment_pattern}}` | Exact signing phrase contributors must post |
+| `{{contributors_markdown}}` | Checked contributors rendered as Markdown |
+| `{{missing_contributors_markdown}}` | Missing contributors rendered as Markdown |
+| `{{registry_links_markdown}}` | Registry record links rendered as Markdown |
+| `{{contributors_count}}` | Number of checked contributors |
+| `{{missing_count}}` | Number of missing contributors |
+| `{{registry_link_count}}` | Number of rendered registry links |
 
 `{{registry_links_markdown}}` works for both backends. For `json-repo`, the links point to the signer JSON file. For `issue`, the links point to the signer issue.
 
@@ -369,8 +375,16 @@ Users create and manage their own GitHub App. CLA Bot does not require a shared 
 Setup flow:
 
 1. [Create a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app) for CLA Bot use.
-2. Grant only the permissions needed by your chosen registry backend.
-3. [Install the app](https://docs.github.com/en/developers/apps/managing-github-apps/installing-github-apps) on the registry repository.
+2. Choose only the repository permissions needed by your registry backend. See [Choosing permissions for a GitHub App](https://docs.github.com/en/enterprise-cloud@latest/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app).
+
+   | Backend | Repository permission |
+   | --- | --- |
+   | `issue` | `Issues: Read & write` |
+   | `json-repo` | `Contents: Read & write` |
+
+   No extra organization permissions, account permissions, or webhook subscriptions are required for CLA Bot's cross-repo registry token flow. GitHub may also show read-only metadata access during install, which is expected.
+
+3. [Install the app](https://docs.github.com/en/developers/apps/managing-github-apps/installing-github-apps) on the registry repository, ideally using "Only select repositories" and choosing just your registry repository.
 4. Download a private key for the app.
 5. Store the app ID as `CLA_BOT_APP_ID` in Actions variables.
 6. Store the private key as `CLA_BOT_APP_PRIVATE_KEY` in Actions secrets.
