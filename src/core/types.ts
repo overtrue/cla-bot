@@ -114,6 +114,7 @@ export type IssueCommentSnapshot = {
   body: string;
   userLogin: string | null;
   createdAt?: string;
+  updatedAt?: string;
 };
 
 export type RepoFile = {

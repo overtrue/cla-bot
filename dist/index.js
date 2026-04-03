@@ -1,6 +1,38 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 9983:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.findMatchingSignatureComments = findMatchingSignatureComments;
+exports.signatureTimestamp = signatureTimestamp;
+const signatureMatcher_1 = __nccwpck_require__(8471);
+const githubLogin_1 = __nccwpck_require__(3344);
+function findMatchingSignatureComments(input) {
+    const pending = new Set(input.missing.map(contributor => contributor.githubLogin));
+    const matches = new Map();
+    for (const comment of input.comments) {
+        if (!comment.userLogin || !(0, signatureMatcher_1.matchesSignatureComment)(comment.body, input.config)) {
+            continue;
+        }
+        const signer = (0, githubLogin_1.normalizeGitHubLogin)(comment.userLogin);
+        if (!pending.has(signer) || matches.has(signer)) {
+            continue;
+        }
+        matches.set(signer, { signer, comment });
+    }
+    return [...matches.values()];
+}
+function signatureTimestamp(comment) {
+    return comment.updatedAt ?? comment.createdAt ?? new Date().toISOString();
+}
+
+
+/***/ }),
+
 /***/ 5043:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -85,7 +117,7 @@ async function run() {
             return;
         }
         case 'issue_comment': {
-            if (github.context.payload.action !== 'created') {
+            if (!['created', 'edited'].includes(github.context.payload.action ?? '')) {
                 return;
             }
             const issue = github.context.payload.issue;
@@ -103,6 +135,7 @@ async function run() {
                     body: comment.body ?? '',
                     userLogin: comment.user?.login ?? null,
                     ...(comment.created_at ? { createdAt: comment.created_at } : {}),
+                    ...(comment.updated_at ? { updatedAt: comment.updated_at } : {}),
                 },
             });
             return;
@@ -164,6 +197,7 @@ const statusReporter_1 = __nccwpck_require__(9645);
 const createRegistry_1 = __nccwpck_require__(7197);
 const githubLogin_1 = __nccwpck_require__(3344);
 const registryGuidance_1 = __nccwpck_require__(5368);
+const commentSignatures_1 = __nccwpck_require__(9983);
 function applySavedSignature(evaluation, signer, signature) {
     const results = evaluation.results.map(result => {
         if (result.contributor.githubLogin !== signer) {
@@ -237,7 +271,7 @@ async function handleIssueComment(client, registryClient, input) {
             claVersion: evaluation.cla.version,
             documentUrl: evaluation.cla.url,
             ...(evaluation.cla.sha256 ? { documentSha256: evaluation.cla.sha256 } : {}),
-            signedAt: input.comment.createdAt ?? new Date().toISOString(),
+            signedAt: (0, commentSignatures_1.signatureTimestamp)(input.comment),
             sourceRepo: `${input.owner}/${input.repo}`,
             sourcePrNumber: input.pullNumber,
             sourceCommentId: input.comment.id,
@@ -319,7 +353,55 @@ const config_1 = __nccwpck_require__(500);
 const logger_1 = __nccwpck_require__(5006);
 const statusReporter_1 = __nccwpck_require__(9645);
 const createRegistry_1 = __nccwpck_require__(7197);
+const commentSignatures_1 = __nccwpck_require__(9983);
 const registryGuidance_1 = __nccwpck_require__(5368);
+function applySavedSignatures(evaluation, signatures) {
+    const bySigner = new Map(signatures.map(signature => [signature.githubLogin, signature]));
+    const results = evaluation.results.map(result => {
+        const signature = bySigner.get(result.contributor.githubLogin);
+        if (!signature) {
+            return result;
+        }
+        return {
+            contributor: result.contributor,
+            signed: true,
+            signature,
+        };
+    });
+    return {
+        ...evaluation,
+        results,
+        missing: results.filter(result => !result.signed).map(result => result.contributor),
+    };
+}
+async function saveCommentSignatures(input) {
+    const comments = await input.client.listIssueComments({
+        owner: input.pullRequest.owner,
+        repo: input.pullRequest.repo,
+        issueNumber: input.pullRequest.pullNumber,
+    });
+    const matches = (0, commentSignatures_1.findMatchingSignatureComments)({
+        comments,
+        missing: input.evaluation.missing,
+        config: input.config,
+    });
+    const signatures = [];
+    for (const match of matches) {
+        signatures.push(await input.registry.saveSignature({
+            githubLogin: match.signer,
+            signerType: 'individual',
+            claVersion: input.evaluation.cla.version,
+            documentUrl: input.evaluation.cla.url,
+            ...(input.evaluation.cla.sha256 ? { documentSha256: input.evaluation.cla.sha256 } : {}),
+            signedAt: (0, commentSignatures_1.signatureTimestamp)(match.comment),
+            sourceRepo: `${input.pullRequest.owner}/${input.pullRequest.repo}`,
+            sourcePrNumber: input.pullRequest.pullNumber,
+            sourceCommentId: match.comment.id,
+            registryType: input.config.registry.type,
+        }));
+    }
+    return signatures;
+}
 async function handlePullRequestTarget(client, registryClient, input) {
     const pullRequest = await client.getPullRequest(input);
     const config = await (0, config_1.loadClaConfig)(client, {
@@ -328,6 +410,7 @@ async function handlePullRequestTarget(client, registryClient, input) {
         ref: pullRequest.baseRef,
     });
     const reporter = new statusReporter_1.GitHubStatusReporter(client);
+    const registry = (0, createRegistry_1.createRegistry)(registryClient, config);
     if (!config.enabled) {
         (0, logger_1.logFields)({
             event: 'pull_request_target',
@@ -351,7 +434,7 @@ async function handlePullRequestTarget(client, registryClient, input) {
             client,
             pullRequest,
             config,
-            registry: (0, createRegistry_1.createRegistry)(registryClient, config),
+            registry,
         });
     }
     catch (error) {
@@ -362,6 +445,27 @@ async function handlePullRequestTarget(client, registryClient, input) {
             operation: 'read',
         });
     }
+    let savedSignatures = [];
+    try {
+        savedSignatures = await saveCommentSignatures({
+            client,
+            registry,
+            pullRequest,
+            config,
+            evaluation,
+        });
+        if (savedSignatures.length > 0) {
+            evaluation = applySavedSignatures(evaluation, savedSignatures);
+        }
+    }
+    catch (error) {
+        throw (0, registryGuidance_1.toRegistryAccessError)(error, {
+            currentRepo: { owner: input.owner, repo: input.repo },
+            config,
+            hasExplicitRegistryToken: input.hasExplicitRegistryToken,
+            operation: 'write',
+        });
+    }
     (0, logger_1.logFields)({
         event: 'pull_request_target',
         repo: `${input.owner}/${input.repo}`,
@@ -369,6 +473,9 @@ async function handlePullRequestTarget(client, registryClient, input) {
         cla_version: evaluation.cla.version,
         contributors: evaluation.contributors.map(contributor => contributor.githubLogin),
         missing: evaluation.missing.map(contributor => contributor.githubLogin),
+        ...(savedSignatures.length > 0
+            ? { recovered_signatures: savedSignatures.map(signature => signature.githubLogin) }
+            : {}),
         registry: config.registry.type,
         result: evaluation.missing.length === 0 ? 'success' : 'failure',
     });
@@ -952,6 +1059,7 @@ function mapIssueComment(comment) {
         body: comment.body ?? '',
         userLogin: comment.user?.login ?? null,
         ...(comment.created_at ? { createdAt: comment.created_at } : {}),
+        ...(comment.updated_at ? { updatedAt: comment.updated_at } : {}),
     };
 }
 class OctokitGitHubClient {

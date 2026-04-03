@@ -4,7 +4,7 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.6
+        uses: overtrue/cla-bot@v0.0.7
         with:
           github-token: ${{ github.token }}
           # PAT or GitHub App token with write access to the registry repository.

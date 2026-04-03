@@ -10,6 +10,7 @@ import { GitHubStatusReporter } from '../github/statusReporter';
 import { createRegistry } from '../registry/createRegistry';
 import { normalizeGitHubLogin } from '../utils/githubLogin';
 import { getRegistrySetupWarnings, toRegistryAccessError } from './registryGuidance';
+import { signatureTimestamp } from './commentSignatures';
 
 function applySavedSignature(
   evaluation: ClaEvaluation,
@@ -101,7 +102,7 @@ export async function handleIssueComment(
       claVersion: evaluation.cla.version,
       documentUrl: evaluation.cla.url,
       ...(evaluation.cla.sha256 ? { documentSha256: evaluation.cla.sha256 } : {}),
-      signedAt: input.comment.createdAt ?? new Date().toISOString(),
+      signedAt: signatureTimestamp(input.comment),
       sourceRepo: `${input.owner}/${input.repo}`,
       sourcePrNumber: input.pullNumber,
       sourceCommentId: input.comment.id,

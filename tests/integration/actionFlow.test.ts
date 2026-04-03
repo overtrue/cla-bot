@@ -336,6 +336,44 @@ describe('CLA action flow', () => {
     expect(check?.summary).toContain('@charlie');
   });
 
+  it('backfills matching signature comments during pull request reruns', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml({ registryType: 'json-repo' }),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
+    client.seedIssueComment({
+      owner: 'app',
+      repo: 'demo',
+      issueNumber: 1,
+      body: 'I have read and agree to the CLA.',
+      userLogin: 'alice',
+      createdAt: '2026-04-02T10:00:00Z',
+      updatedAt: '2026-04-02T10:05:00Z',
+    });
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const file = client.getFile({
+      owner: 'overtrue',
+      repo: 'cla-registry',
+      path: 'signatures/individual/alice.json',
+    });
+    const prComment = client
+      .getIssueComments({ owner: 'app', repo: 'demo', issueNumber: 1 })
+      .find(comment => comment.body.includes('<!-- cla-bot -->'));
+
+    expect(check?.conclusion).toBe('success');
+    expect(file?.content).toContain('"signed_at": "2026-04-02T10:05:00Z"');
+    expect(prComment?.body).toContain('CLA requirements are satisfied');
+  });
+
   it('invalidates old signatures when the CLA version changes', async () => {
     const client = new MemoryGitHubClient();
     client.seedFile({

@@ -63,6 +63,7 @@ type ApiIssueComment = {
   body?: string | null;
   user?: { login?: string | null } | null;
   created_at?: string;
+  updated_at?: string;
 };
 
 function mapIssueComment(comment: ApiIssueComment): IssueCommentSnapshot {
@@ -71,6 +72,7 @@ function mapIssueComment(comment: ApiIssueComment): IssueCommentSnapshot {
     body: comment.body ?? '',
     userLogin: comment.user?.login ?? null,
     ...(comment.created_at ? { createdAt: comment.created_at } : {}),
+    ...(comment.updated_at ? { updatedAt: comment.updated_at } : {}),
   };
 }
 

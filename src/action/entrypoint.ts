@@ -55,7 +55,7 @@ export async function run(): Promise<void> {
     }
 
     case 'issue_comment': {
-      if (github.context.payload.action !== 'created') {
+      if (!['created', 'edited'].includes(github.context.payload.action ?? '')) {
         return;
       }
 
@@ -76,6 +76,7 @@ export async function run(): Promise<void> {
           body: comment.body ?? '',
           userLogin: comment.user?.login ?? null,
           ...(comment.created_at ? { createdAt: comment.created_at } : {}),
+          ...(comment.updated_at ? { updatedAt: comment.updated_at } : {}),
         },
       });
       return;

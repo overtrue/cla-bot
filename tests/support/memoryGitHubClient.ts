@@ -100,6 +100,19 @@ export class MemoryGitHubClient implements GitHubClient {
     return [...this.ensureIssue(input).comments];
   }
 
+  seedIssueComment(input: IssueRef & { body: string; userLogin: string; createdAt?: string; updatedAt?: string }): void {
+    const issue = this.ensureIssue(input);
+    const state = this.ensureRepo(input);
+
+    issue.comments.push({
+      id: state.nextCommentId++,
+      body: input.body,
+      userLogin: input.userLogin,
+      ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+      ...(input.updatedAt ? { updatedAt: input.updatedAt } : {}),
+    });
+  }
+
   getCheckRuns(input: RepoCoordinates): StoredCheckRun[] {
     return [...this.ensureRepo(input).checkRuns];
   }
@@ -245,6 +258,7 @@ export class MemoryGitHubClient implements GitHubClient {
       body: input.body,
       userLogin: 'cla-bot',
       createdAt: new Date('2026-04-02T00:00:00Z').toISOString(),
+      updatedAt: new Date('2026-04-02T00:00:00Z').toISOString(),
     };
 
     issue.comments.push(comment);
@@ -257,6 +271,7 @@ export class MemoryGitHubClient implements GitHubClient {
 
       if (comment) {
         comment.body = input.body;
+        comment.updatedAt = new Date('2026-04-02T00:00:00Z').toISOString();
         return comment;
       }
     }

@@ -44,7 +44,7 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.6
+        uses: overtrue/cla-bot@v0.0.7
         with:
           github-token: ${{ github.token }}
 ```
@@ -77,7 +77,7 @@ flowchart LR
   A["Pull request opened"] --> B["CLA Check runs"]
   B --> C{"All required contributors signed?"}
   C -->|No| D["Bot posts signing instructions"]
-  D --> E["Missing contributor comments matching CLA phrase"]
+  D --> E["Missing contributor comments match or are edited to the CLA phrase"]
   E --> F["CLA Check runs again"]
   F --> C
   C -->|Yes| G["PR can be merged"]
@@ -92,6 +92,8 @@ Each missing contributor must comment:
 ```text
 I have read and agree to the CLA.
 ```
+
+If a contributor posts the wrong text first and then edits the comment to the exact phrase, keep `issue_comment.edited` enabled so CLA Bot re-checks it immediately.
 
 By default the bot checks:
 
@@ -204,7 +206,7 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -218,7 +220,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.6
+        uses: overtrue/cla-bot@v0.0.7
         with:
           github-token: ${{ github.token }}
 ```
@@ -234,7 +236,7 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -248,7 +250,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.6
+        uses: overtrue/cla-bot@v0.0.7
         with:
           github-token: ${{ github.token }}
           registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
@@ -407,7 +409,7 @@ Example for a cross-repo `issue` backend. Replace `your-org` and `your-cla-regis
     permission-issues: write
 
 - name: Run CLA Bot
-  uses: overtrue/cla-bot@v0.0.6
+  uses: overtrue/cla-bot@v0.0.7
   with:
     github-token: ${{ github.token }}
     registry-token: ${{ steps.registry-token.outputs.token }}
