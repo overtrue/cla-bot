@@ -99,12 +99,14 @@ export type PullRequestSnapshot = PullRequestRef & {
   authorLogin: string | null;
   headSha: string;
   baseRef: string;
+  baseSha: string;
   htmlUrl: string;
 };
 
 export type PullCommit = {
   authorLogin: string | null;
   message: string;
+  parentShas: string[];
 };
 
 export type IssueCommentSnapshot = {

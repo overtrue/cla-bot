@@ -539,9 +539,28 @@ function resolveContributorsFromSnapshot(pullRequest, commits, config) {
     }
     return [...contributors.values()];
 }
+async function isBaseBranchSyncMergeCommit(input) {
+    if (input.commit.parentShas.length < 2) {
+        return false;
+    }
+    const parentOnBaseHistory = await Promise.all(input.commit.parentShas.map(parentSha => input.client.isCommitAncestor({
+        owner: input.pullRequest.owner,
+        repo: input.pullRequest.repo,
+        ancestorSha: parentSha,
+        descendantSha: input.pullRequest.baseSha,
+    })));
+    return parentOnBaseHistory.some(Boolean) && parentOnBaseHistory.some(onBaseHistory => !onBaseHistory);
+}
 async function resolveContributors(input) {
     const commits = await input.client.listPullRequestCommits(input.pullRequest);
-    return resolveContributorsFromSnapshot(input.pullRequest, commits, input.config);
+    const filteredCommits = await Promise.all(commits.map(async (commit) => (await isBaseBranchSyncMergeCommit({
+        client: input.client,
+        pullRequest: input.pullRequest,
+        commit,
+    }))
+        ? null
+        : commit));
+    return resolveContributorsFromSnapshot(input.pullRequest, filteredCommits.filter((commit) => commit !== null), input.config);
 }
 
 
@@ -1031,6 +1050,7 @@ class OctokitGitHubClient {
             authorLogin: response.data.user?.login ?? null,
             headSha: response.data.head.sha,
             baseRef: response.data.base.ref,
+            baseSha: response.data.base.sha,
             htmlUrl: response.data.html_url,
         };
     }
@@ -1044,7 +1064,17 @@ class OctokitGitHubClient {
         return commits.map(commit => ({
             authorLogin: commit.author?.login ?? null,
             message: commit.commit.message,
+            parentShas: commit.parents.map(parent => parent.sha),
         }));
+    }
+    async isCommitAncestor(input) {
+        const response = await this.octokit.rest.repos.compareCommits({
+            owner: input.owner,
+            repo: input.repo,
+            base: input.ancestorSha,
+            head: input.descendantSha,
+        });
+        return response.data.status === 'ahead' || response.data.status === 'identical';
     }
     async listIssueComments(input) {
         const comments = await this.octokit.paginate(this.octokit.rest.issues.listComments, {

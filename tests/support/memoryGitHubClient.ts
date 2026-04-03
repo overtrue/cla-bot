@@ -35,6 +35,7 @@ type RepoState = {
   refs: Map<string, Map<string, RepoFile>>;
   pulls: Map<number, PullRequestSnapshot>;
   commits: Map<number, PullCommit[]>;
+  commitParents: Map<string, string[]>;
   issues: Map<number, StoredIssue>;
   fileWrites: StoredFileWrite[];
   checkRuns: StoredCheckRun[];
@@ -81,6 +82,10 @@ export class MemoryGitHubClient implements GitHubClient {
       comments: [],
     });
     state.nextIssueNumber = Math.max(state.nextIssueNumber, pullRequest.pullNumber + 1);
+  }
+
+  seedCommit(input: RepoCoordinates & { sha: string; parentShas?: string[] }): void {
+    this.ensureRepo(input).commitParents.set(input.sha, [...(input.parentShas ?? [])]);
   }
 
   setPullRequestCommits(input: PullRequestRef, commits: PullCommit[]): void {
@@ -165,6 +170,36 @@ export class MemoryGitHubClient implements GitHubClient {
 
   async listPullRequestCommits(input: PullRequestRef): Promise<PullCommit[]> {
     return [...(this.ensureRepo(input).commits.get(input.pullNumber) ?? [])];
+  }
+
+  async isCommitAncestor(input: RepoCoordinates & { ancestorSha: string; descendantSha: string }): Promise<boolean> {
+    if (input.ancestorSha === input.descendantSha) {
+      return true;
+    }
+
+    const visited = new Set<string>();
+    const stack = [input.descendantSha];
+    const state = this.ensureRepo(input);
+
+    while (stack.length > 0) {
+      const sha = stack.pop();
+
+      if (!sha || visited.has(sha)) {
+        continue;
+      }
+
+      visited.add(sha);
+
+      for (const parent of state.commitParents.get(sha) ?? []) {
+        if (parent === input.ancestorSha) {
+          return true;
+        }
+
+        stack.push(parent);
+      }
+    }
+
+    return false;
   }
 
   async listIssueComments(input: IssueRef): Promise<IssueCommentSnapshot[]> {
@@ -257,6 +292,7 @@ export class MemoryGitHubClient implements GitHubClient {
       refs: new Map([['main', new Map()]]),
       pulls: new Map(),
       commits: new Map(),
+      commitParents: new Map(),
       issues: new Map(),
       fileWrites: [],
       checkRuns: [],

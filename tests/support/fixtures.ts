@@ -123,11 +123,20 @@ export function pullRequest(input?: Partial<PullRequestSnapshot>): PullRequestSn
     authorLogin: 'alice',
     headSha: 'head-sha',
     baseRef: 'main',
+    baseSha: 'base-sha',
     htmlUrl: 'https://github.com/app/demo/pull/1',
     ...input,
   };
 }
 
-export function commit(authorLogin: string | null, message = 'feat: change'): PullCommit {
-  return { authorLogin, message };
+export function commit(
+  authorLogin: string | null,
+  message = 'feat: change',
+  input?: { parentShas?: string[] },
+): PullCommit {
+  return {
+    authorLogin,
+    message,
+    parentShas: input?.parentShas ?? ['parent-sha'],
+  };
 }

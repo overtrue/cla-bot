@@ -57,11 +57,50 @@ export function resolveContributorsFromSnapshot(
   return [...contributors.values()];
 }
 
+async function isBaseBranchSyncMergeCommit(input: {
+  client: Pick<GitHubClient, 'isCommitAncestor'>;
+  pullRequest: PullRequestSnapshot;
+  commit: PullCommit;
+}): Promise<boolean> {
+  if (input.commit.parentShas.length < 2) {
+    return false;
+  }
+
+  const parentOnBaseHistory = await Promise.all(
+    input.commit.parentShas.map(parentSha =>
+      input.client.isCommitAncestor({
+        owner: input.pullRequest.owner,
+        repo: input.pullRequest.repo,
+        ancestorSha: parentSha,
+        descendantSha: input.pullRequest.baseSha,
+      }),
+    ),
+  );
+
+  return parentOnBaseHistory.some(Boolean) && parentOnBaseHistory.some(onBaseHistory => !onBaseHistory);
+}
+
 export async function resolveContributors(input: {
   client: GitHubClient;
   pullRequest: PullRequestSnapshot;
   config: ClaConfig;
 }): Promise<Contributor[]> {
   const commits = await input.client.listPullRequestCommits(input.pullRequest);
-  return resolveContributorsFromSnapshot(input.pullRequest, commits, input.config);
+  const filteredCommits = await Promise.all(
+    commits.map(async commit =>
+      (await isBaseBranchSyncMergeCommit({
+        client: input.client,
+        pullRequest: input.pullRequest,
+        commit,
+      }))
+        ? null
+        : commit,
+    ),
+  );
+
+  return resolveContributorsFromSnapshot(
+    input.pullRequest,
+    filteredCommits.filter((commit): commit is PullCommit => commit !== null),
+    input.config,
+  );
 }

@@ -24,6 +24,7 @@ export interface GitHubClient {
   ensureBranch(input: RepoCoordinates & { branch: string }): Promise<void>;
   getPullRequest(input: PullRequestRef): Promise<PullRequestSnapshot>;
   listPullRequestCommits(input: PullRequestRef): Promise<PullCommit[]>;
+  isCommitAncestor(input: RepoCoordinates & { ancestorSha: string; descendantSha: string }): Promise<boolean>;
   listIssueComments(input: IssueRef): Promise<IssueCommentSnapshot[]>;
   findIssueByTitle(input: RepoCoordinates & { title: string }): Promise<IssueSnapshot | null>;
   createIssue(input: RepoCoordinates & { title: string; body: string; labels: string[] }): Promise<IssueSnapshot>;
@@ -181,6 +182,7 @@ export class OctokitGitHubClient implements GitHubClient {
       authorLogin: response.data.user?.login ?? null,
       headSha: response.data.head.sha,
       baseRef: response.data.base.ref,
+      baseSha: response.data.base.sha,
       htmlUrl: response.data.html_url,
     };
   }
@@ -196,7 +198,19 @@ export class OctokitGitHubClient implements GitHubClient {
     return commits.map(commit => ({
       authorLogin: commit.author?.login ?? null,
       message: commit.commit.message,
+      parentShas: commit.parents.map(parent => parent.sha),
     }));
+  }
+
+  async isCommitAncestor(input: RepoCoordinates & { ancestorSha: string; descendantSha: string }): Promise<boolean> {
+    const response = await this.octokit.rest.repos.compareCommits({
+      owner: input.owner,
+      repo: input.repo,
+      base: input.ancestorSha,
+      head: input.descendantSha,
+    });
+
+    return response.data.status === 'ahead' || response.data.status === 'identical';
   }
 
   async listIssueComments(input: IssueRef): Promise<IssueCommentSnapshot[]> {
