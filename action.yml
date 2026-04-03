@@ -5,7 +5,7 @@ branding:
   color: 'green'
 inputs:
   github-token:
-    description: GitHub token for the repository running the workflow. Usually pass ${{ github.token }}.
+    description: GitHub token for the repository running the workflow.
     required: true
   registry-token:
     description: Optional token for the registry repository. Use this when registry.repository is a different repo. Defaults to github-token.

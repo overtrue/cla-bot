@@ -18,6 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.5
+        uses: overtrue/cla-bot@v0.0.6
         with:
           github-token: ${{ github.token }}

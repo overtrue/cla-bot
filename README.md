@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.5
+        uses: overtrue/cla-bot@v0.0.6
         with:
           github-token: ${{ github.token }}
 ```
@@ -218,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.5
+        uses: overtrue/cla-bot@v0.0.6
         with:
           github-token: ${{ github.token }}
 ```
@@ -248,7 +248,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.5
+        uses: overtrue/cla-bot@v0.0.6
         with:
           github-token: ${{ github.token }}
           registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
@@ -407,7 +407,7 @@ Example for a cross-repo `issue` backend. Replace `your-org` and `your-cla-regis
     permission-issues: write
 
 - name: Run CLA Bot
-  uses: overtrue/cla-bot@v0.0.5
+  uses: overtrue/cla-bot@v0.0.6
   with:
     github-token: ${{ github.token }}
     registry-token: ${{ steps.registry-token.outputs.token }}
