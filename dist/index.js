@@ -591,26 +591,16 @@ function normalize(input, config) {
     }
     return value;
 }
-function matchesStandaloneLine(commentBody, expected, config) {
-    let inFence = false;
-    for (const rawLine of commentBody.split(/\r?\n/u)) {
-        const line = rawLine.trim();
-        if (line.startsWith('```')) {
-            inFence = !inFence;
-            continue;
-        }
-        if (inFence || line === '' || line.startsWith('>')) {
-            continue;
-        }
-        if (normalize(line, config) === expected) {
-            return true;
-        }
-    }
-    return false;
+function filterQuotedReply(commentBody) {
+    return commentBody
+        .split(/\r?\n/u)
+        .map(line => line.trim())
+        .filter(line => line !== '' && !line.startsWith('>'))
+        .join('\n');
 }
 function matchesSignatureComment(commentBody, config) {
     const expected = normalize(config.signing.commentPattern, config);
-    return normalize(commentBody, config) === expected || matchesStandaloneLine(commentBody, expected, config);
+    return normalize(commentBody, config) === expected || normalize(filterQuotedReply(commentBody), config) === expected;
 }
 
 

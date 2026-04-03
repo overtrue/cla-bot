@@ -94,7 +94,7 @@ I have read and agree to the CLA.
 ```
 
 If a contributor posts the wrong text first and then edits the comment to the exact phrase, keep `issue_comment.edited` enabled so CLA Bot re-checks it immediately.
-The signing phrase can also appear as its own standalone line in a longer comment, such as a reply that quotes the bot instructions first.
+CLA Bot also ignores quoted reply lines and blank lines before matching, so a GitHub quote-reply that leaves only the signing phrase in the remaining body still works.
 
 By default the bot checks:
 

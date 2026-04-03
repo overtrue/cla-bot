@@ -41,13 +41,6 @@ describe('matchesSignatureComment', () => {
     expect(matchesSignatureComment('  I have read and agree to the CLA.  ', config)).toBe(true);
   });
 
-  it('matches a standalone signature line in a longer comment', () => {
-    const config = parseClaConfig(claConfigYaml());
-    expect(
-      matchesSignatureComment('Thanks for the reminder.\n\nI have read and agree to the CLA.\n', config),
-    ).toBe(true);
-  });
-
   it('matches a standalone signature line after quoted instructions', () => {
     const config = parseClaConfig(claConfigYaml());
     expect(
@@ -66,6 +59,11 @@ describe('matchesSignatureComment', () => {
   it('rejects extra text after the signing phrase', () => {
     const config = parseClaConfig(claConfigYaml());
     expect(matchesSignatureComment('I have read and agree to the CLA please merge', config)).toBe(false);
+  });
+
+  it('rejects extra non-quoted text around the signing phrase', () => {
+    const config = parseClaConfig(claConfigYaml());
+    expect(matchesSignatureComment('Thanks for the reminder.\n\nI have read and agree to the CLA.', config)).toBe(false);
   });
 
   it('rejects the phrase when it only appears in a quote block', () => {

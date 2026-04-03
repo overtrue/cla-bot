@@ -20,31 +20,16 @@ function normalize(input: string, config: ClaConfig): string {
   return value;
 }
 
-function matchesStandaloneLine(commentBody: string, expected: string, config: ClaConfig): boolean {
-  let inFence = false;
-
-  for (const rawLine of commentBody.split(/\r?\n/u)) {
-    const line = rawLine.trim();
-
-    if (line.startsWith('```')) {
-      inFence = !inFence;
-      continue;
-    }
-
-    if (inFence || line === '' || line.startsWith('>')) {
-      continue;
-    }
-
-    if (normalize(line, config) === expected) {
-      return true;
-    }
-  }
-
-  return false;
+function filterQuotedReply(commentBody: string): string {
+  return commentBody
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .filter(line => line !== '' && !line.startsWith('>'))
+    .join('\n');
 }
 
 export function matchesSignatureComment(commentBody: string, config: ClaConfig): boolean {
   const expected = normalize(config.signing.commentPattern, config);
 
-  return normalize(commentBody, config) === expected || matchesStandaloneLine(commentBody, expected, config);
+  return normalize(commentBody, config) === expected || normalize(filterQuotedReply(commentBody), config) === expected;
 }
