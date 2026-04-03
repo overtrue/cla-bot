@@ -92,6 +92,43 @@ describe('CLA action flow', () => {
     expect(registryIssue).toBeDefined();
   });
 
+  it('turns green when the signer quotes instructions and adds the phrase on its own line', async () => {
+    const client = new MemoryGitHubClient();
+    client.seedFile({
+      owner: 'app',
+      repo: 'demo',
+      path: '.github/cla.yml',
+      content: claConfigYaml(),
+    });
+    client.seedPullRequest(pullRequest(), []);
+
+    await handlePullRequestTarget(client, client, { owner: 'app', repo: 'demo', pullNumber: 1, ...registryAccess });
+    await handleIssueComment(client, client, {
+      owner: 'app',
+      repo: 'demo',
+      pullNumber: 1,
+      ...registryAccess,
+      comment: {
+        id: 100,
+        body: [
+          '> This pull request requires CLA signatures before it can be merged.',
+          '> ',
+          '> `I have read and agree to the CLA.`',
+          '',
+          'I have read and agree to the CLA.',
+        ].join('\n'),
+        userLogin: 'alice',
+        createdAt: '2026-04-02T10:00:00Z',
+      },
+    });
+
+    const check = client.getCheckRuns({ owner: 'app', repo: 'demo' }).at(-1);
+    const registryIssue = client.getIssueByTitle({ owner: 'overtrue', repo: 'cla-registry', title: 'CLA - alice' });
+
+    expect(check?.conclusion).toBe('success');
+    expect(registryIssue).toBeDefined();
+  });
+
   it('stays red when terminal punctuation is required by config', async () => {
     const client = new MemoryGitHubClient();
     client.seedFile({
