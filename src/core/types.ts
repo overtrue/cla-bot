@@ -97,6 +97,7 @@ export type PullRequestRef = RepoCoordinates & {
 
 export type PullRequestSnapshot = PullRequestRef & {
   authorLogin: string | null;
+  authorIsBot?: boolean;
   headSha: string;
   baseRef: string;
   baseSha: string;
@@ -105,6 +106,7 @@ export type PullRequestSnapshot = PullRequestRef & {
 
 export type PullCommit = {
   authorLogin: string | null;
+  authorIsBot?: boolean;
   message: string;
   parentShas: string[];
 };

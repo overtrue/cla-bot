@@ -18,12 +18,12 @@ export function resolveContributorsFromSnapshot(
   const allowlist = new Set(config.contributors.allowlist.map(normalizeGitHubLogin));
   const contributors = new Map<string, Contributor>();
 
-  const add = (login: string | null, source: Contributor['source']): void => {
+  const add = (login: string | null, source: Contributor['source'], authorIsBot?: boolean): void => {
     if (!login) {
       return;
     }
 
-    const contributor = createContributor(login, source);
+    const contributor = createContributor(login, source, authorIsBot);
 
     if (config.contributors.excludeBots && contributor.isBot) {
       return;
@@ -37,12 +37,12 @@ export function resolveContributorsFromSnapshot(
   };
 
   if (config.contributors.checkPrAuthor) {
-    add(pullRequest.authorLogin, 'pr_author');
+    add(pullRequest.authorLogin, 'pr_author', pullRequest.authorIsBot);
   }
 
   if (config.contributors.checkCommitAuthors) {
     for (const commit of commits) {
-      add(commit.authorLogin, 'commit_author');
+      add(commit.authorLogin, 'commit_author', commit.authorIsBot);
     }
   }
 

@@ -182,6 +182,7 @@ export class OctokitGitHubClient implements GitHubClient {
       repo: input.repo,
       pullNumber: input.pullNumber,
       authorLogin: response.data.user?.login ?? null,
+      authorIsBot: response.data.user?.type === 'Bot',
       headSha: response.data.head.sha,
       baseRef: response.data.base.ref,
       baseSha: response.data.base.sha,
@@ -199,6 +200,7 @@ export class OctokitGitHubClient implements GitHubClient {
 
     return commits.map(commit => ({
       authorLogin: commit.author?.login ?? null,
+      authorIsBot: commit.author?.type === 'Bot',
       message: commit.commit.message,
       parentShas: commit.parents.map(parent => parent.sha),
     }));

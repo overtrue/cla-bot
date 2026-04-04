@@ -624,11 +624,11 @@ function extractCoauthorLogins(message) {
 function resolveContributorsFromSnapshot(pullRequest, commits, config) {
     const allowlist = new Set(config.contributors.allowlist.map(githubLogin_1.normalizeGitHubLogin));
     const contributors = new Map();
-    const add = (login, source) => {
+    const add = (login, source, authorIsBot) => {
         if (!login) {
             return;
         }
-        const contributor = (0, normalizeContributor_1.createContributor)(login, source);
+        const contributor = (0, normalizeContributor_1.createContributor)(login, source, authorIsBot);
         if (config.contributors.excludeBots && contributor.isBot) {
             return;
         }
@@ -638,11 +638,11 @@ function resolveContributorsFromSnapshot(pullRequest, commits, config) {
         contributors.set(contributor.githubLogin, contributors.get(contributor.githubLogin) ?? contributor);
     };
     if (config.contributors.checkPrAuthor) {
-        add(pullRequest.authorLogin, 'pr_author');
+        add(pullRequest.authorLogin, 'pr_author', pullRequest.authorIsBot);
     }
     if (config.contributors.checkCommitAuthors) {
         for (const commit of commits) {
-            add(commit.authorLogin, 'commit_author');
+            add(commit.authorLogin, 'commit_author', commit.authorIsBot);
         }
     }
     if (config.contributors.checkCoauthors) {
@@ -689,12 +689,12 @@ async function resolveContributors(input) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createContributor = createContributor;
 const githubLogin_1 = __nccwpck_require__(3344);
-function createContributor(login, source) {
+function createContributor(login, source, authorIsBot) {
     const githubLogin = (0, githubLogin_1.normalizeGitHubLogin)(login);
     return {
         githubLogin,
         source,
-        isBot: githubLogin.endsWith('[bot]'),
+        isBot: authorIsBot || githubLogin.endsWith('[bot]'),
     };
 }
 
@@ -1164,6 +1164,7 @@ class OctokitGitHubClient {
             repo: input.repo,
             pullNumber: input.pullNumber,
             authorLogin: response.data.user?.login ?? null,
+            authorIsBot: response.data.user?.type === 'Bot',
             headSha: response.data.head.sha,
             baseRef: response.data.base.ref,
             baseSha: response.data.base.sha,
@@ -1179,6 +1180,7 @@ class OctokitGitHubClient {
         });
         return commits.map(commit => ({
             authorLogin: commit.author?.login ?? null,
+            authorIsBot: commit.author?.type === 'Bot',
             message: commit.commit.message,
             parentShas: commit.parents.map(parent => parent.sha),
         }));

@@ -31,6 +31,26 @@ describe('resolveContributorsFromSnapshot', () => {
     expect(contributors).toEqual([]);
   });
 
+  it('filters bot PR authors reported by GitHub without a [bot] suffix', () => {
+    const contributors = resolveContributorsFromSnapshot(
+      pullRequest({ authorLogin: 'copilot', authorIsBot: true }),
+      [],
+      parseClaConfig(claConfigYaml()),
+    );
+
+    expect(contributors).toEqual([]);
+  });
+
+  it('filters bot commit authors reported by GitHub without a [bot] suffix', () => {
+    const contributors = resolveContributorsFromSnapshot(
+      pullRequest(),
+      [commit('copilot', 'feat: generated change', { authorIsBot: true })],
+      parseClaConfig(claConfigYaml()),
+    );
+
+    expect(contributors.map(item => item.githubLogin)).toEqual(['alice']);
+  });
+
   it('filters allowlist entries', () => {
     const contributors = resolveContributorsFromSnapshot(
       pullRequest(),

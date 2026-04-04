@@ -132,10 +132,11 @@ export function pullRequest(input?: Partial<PullRequestSnapshot>): PullRequestSn
 export function commit(
   authorLogin: string | null,
   message = 'feat: change',
-  input?: { parentShas?: string[] },
+  input?: { parentShas?: string[]; authorIsBot?: boolean },
 ): PullCommit {
   return {
     authorLogin,
+    ...(typeof input?.authorIsBot === 'boolean' ? { authorIsBot: input.authorIsBot } : {}),
     message,
     parentShas: input?.parentShas ?? ['parent-sha'],
   };
