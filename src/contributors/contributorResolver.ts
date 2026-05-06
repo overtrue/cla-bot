@@ -5,6 +5,7 @@ import { normalizeGitHubLogin } from '../utils/githubLogin';
 
 const COAUTHOR_PATTERN =
   /Co-authored-by:\s*(?:.+?\s)?(?:\(@)?@([A-Za-z0-9-]+(?:\[bot\])?)/gi;
+const BUILT_IN_ALLOWLIST = ['cursoragent'] as const;
 
 export function extractCoauthorLogins(message: string): string[] {
   return [...message.matchAll(COAUTHOR_PATTERN)].map((match) => normalizeGitHubLogin(match[1] ?? ''));
@@ -15,7 +16,7 @@ export function resolveContributorsFromSnapshot(
   commits: PullCommit[],
   config: ClaConfig,
 ): Contributor[] {
-  const allowlist = new Set(config.contributors.allowlist.map(normalizeGitHubLogin));
+  const allowlist = new Set([...BUILT_IN_ALLOWLIST, ...config.contributors.allowlist].map(normalizeGitHubLogin));
   const contributors = new Map<string, Contributor>();
 
   const add = (login: string | null, source: Contributor['source'], authorIsBot?: boolean): void => {

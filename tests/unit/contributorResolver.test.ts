@@ -61,6 +61,16 @@ describe('resolveContributorsFromSnapshot', () => {
     expect(contributors.map(item => item.githubLogin)).toEqual(['alice']);
   });
 
+  it('filters built-in allowlist entries', () => {
+    const contributors = resolveContributorsFromSnapshot(
+      pullRequest({ authorLogin: 'cursoragent' }),
+      [commit('CursorAgent')],
+      parseClaConfig(claConfigYaml()),
+    );
+
+    expect(contributors).toEqual([]);
+  });
+
   it('ignores merge commits that only sync the base branch into the PR branch', async () => {
     const client = new MemoryGitHubClient();
     const snapshot = pullRequest({ baseSha: 'base-3' });

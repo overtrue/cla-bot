@@ -618,11 +618,12 @@ exports.resolveContributors = resolveContributors;
 const normalizeContributor_1 = __nccwpck_require__(3009);
 const githubLogin_1 = __nccwpck_require__(3344);
 const COAUTHOR_PATTERN = /Co-authored-by:\s*(?:.+?\s)?(?:\(@)?@([A-Za-z0-9-]+(?:\[bot\])?)/gi;
+const BUILT_IN_ALLOWLIST = ['cursoragent'];
 function extractCoauthorLogins(message) {
     return [...message.matchAll(COAUTHOR_PATTERN)].map((match) => (0, githubLogin_1.normalizeGitHubLogin)(match[1] ?? ''));
 }
 function resolveContributorsFromSnapshot(pullRequest, commits, config) {
-    const allowlist = new Set(config.contributors.allowlist.map(githubLogin_1.normalizeGitHubLogin));
+    const allowlist = new Set([...BUILT_IN_ALLOWLIST, ...config.contributors.allowlist].map(githubLogin_1.normalizeGitHubLogin));
     const contributors = new Map();
     const add = (login, source, authorIsBot) => {
         if (!login) {

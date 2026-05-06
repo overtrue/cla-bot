@@ -141,6 +141,7 @@ contributors:
   allowlist:
     - dependabot[bot]
     - github-actions[bot]
+    - cursoragent
 
 registry:
   type: issue
@@ -154,6 +155,7 @@ status:
 When `contributors.check_commit_authors` is enabled, CLA Bot ignores merge commits that only sync the PR base branch into the PR branch, such as merging `main` into a feature branch.
 
 When `contributors.exclude_bots` is enabled, CLA Bot excludes both logins ending with `[bot]` and accounts that GitHub reports as bot users, such as `copilot`.
+CLA Bot also skips `cursoragent` through its built-in allowlist.
 
 ## Registry Backends
 
