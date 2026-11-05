@@ -71,6 +71,33 @@ describe('resolveContributorsFromSnapshot', () => {
     expect(contributors).toEqual([]);
   });
 
+  it('matches built-in allowlist with or without the [bot] suffix', () => {
+    const contributors = resolveContributorsFromSnapshot(
+      pullRequest({ authorLogin: 'cursoragent[bot]', authorIsBot: true }),
+      [
+        commit('Dependabot[bot]'),
+        commit('GitHub-Actions[bot]'),
+        commit('renovate[bot]'),
+        commit('copilot-swe-agent[bot]'),
+        commit('Copilot', 'feat: generated', { authorIsBot: true }),
+      ],
+      // Keep bots in the candidate set so allowlist matching is what filters them.
+      parseClaConfig(claConfigYaml({ excludeBots: false })),
+    );
+
+    expect(contributors).toEqual([]);
+  });
+
+  it('matches config allowlist entries with or without the [bot] suffix', () => {
+    const contributors = resolveContributorsFromSnapshot(
+      pullRequest(),
+      [commit('release-bot[bot]')],
+      parseClaConfig(claConfigYaml({ allowlist: ['Release-Bot'], excludeBots: false })),
+    );
+
+    expect(contributors.map(item => item.githubLogin)).toEqual(['alice']);
+  });
+
   it('ignores merge commits that only sync the base branch into the PR branch', async () => {
     const client = new MemoryGitHubClient();
     const snapshot = pullRequest({ baseSha: 'base-3' });

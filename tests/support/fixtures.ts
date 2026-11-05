@@ -7,6 +7,7 @@ export function claConfigYaml(input?: {
   pathPrefix?: string;
   branch?: string;
   allowlist?: string[];
+  excludeBots?: boolean;
   caseInsensitive?: boolean;
   trimWhitespace?: boolean;
   ignoreTerminalPunctuation?: boolean;
@@ -94,7 +95,7 @@ export function claConfigYaml(input?: {
     '  check_pr_author: true',
     `  check_commit_authors: ${String(input?.checkCommitAuthors ?? true)}`,
     '  check_coauthors: false',
-    '  exclude_bots: true',
+    `  exclude_bots: ${String(input?.excludeBots ?? true)}`,
     ...(allowlist.length === 0
       ? ['  allowlist: []']
       : ['  allowlist:', ...allowlist.map(login => `    - ${login}`)]),

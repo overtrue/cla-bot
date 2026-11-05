@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.10
+        uses: overtrue/cla-bot@v0.1.0
         with:
           github-token: ${{ github.token }}
 ```
@@ -155,7 +155,7 @@ status:
 When `contributors.check_commit_authors` is enabled, CLA Bot ignores merge commits that only sync the PR base branch into the PR branch, such as merging `main` into a feature branch.
 
 When `contributors.exclude_bots` is enabled, CLA Bot excludes both logins ending with `[bot]` and accounts that GitHub reports as bot users, such as `copilot`.
-CLA Bot also skips `cursoragent` through its built-in allowlist.
+CLA Bot also skips well-known automation accounts through its built-in allowlist (for example `cursoragent`, `dependabot[bot]`, `github-actions[bot]`, `renovate[bot]`, `copilot`, and Copilot coding-agent accounts). Allowlist matching is case-insensitive and treats `name` / `name[bot]` as the same entry.
 
 ## Registry Backends
 
@@ -225,7 +225,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.10
+        uses: overtrue/cla-bot@v0.1.0
         with:
           github-token: ${{ github.token }}
 ```
@@ -255,7 +255,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run CLA Bot
-        uses: overtrue/cla-bot@v0.0.10
+        uses: overtrue/cla-bot@v0.1.0
         with:
           github-token: ${{ github.token }}
           registry-token: ${{ secrets.CLA_BOT_REGISTRY_TOKEN }}
@@ -414,7 +414,7 @@ Example for a cross-repo `issue` backend. Replace `your-org` and `your-cla-regis
     permission-issues: write
 
 - name: Run CLA Bot
-  uses: overtrue/cla-bot@v0.0.10
+  uses: overtrue/cla-bot@v0.1.0
   with:
     github-token: ${{ github.token }}
     registry-token: ${{ steps.registry-token.outputs.token }}

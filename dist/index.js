@@ -612,18 +612,42 @@ function matchesSignatureComment(commentBody, config) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.expandAllowlistKeys = expandAllowlistKeys;
 exports.extractCoauthorLogins = extractCoauthorLogins;
 exports.resolveContributorsFromSnapshot = resolveContributorsFromSnapshot;
 exports.resolveContributors = resolveContributors;
 const normalizeContributor_1 = __nccwpck_require__(5390);
 const githubLogin_1 = __nccwpck_require__(3344);
 const COAUTHOR_PATTERN = /Co-authored-by:\s*(?:.+?\s)?(?:\(@)?@([A-Za-z0-9-]+(?:\[bot\])?)/gi;
-const BUILT_IN_ALLOWLIST = ['cursoragent'];
+const BUILT_IN_ALLOWLIST = [
+    'cursoragent',
+    'dependabot[bot]',
+    'github-actions[bot]',
+    'renovate[bot]',
+    'copilot',
+    'copilot-swe-agent[bot]',
+    'copilot-pull-request-reviewer[bot]',
+];
+/** Expand a login into bare + `[bot]` forms for case-insensitive allowlist matching. */
+function expandAllowlistKeys(login) {
+    const normalized = (0, githubLogin_1.normalizeGitHubLogin)(login);
+    if (!normalized) {
+        return [];
+    }
+    const bare = normalized.endsWith('[bot]') ? normalized.slice(0, -'[bot]'.length) : normalized;
+    if (!bare) {
+        return [normalized];
+    }
+    return bare === normalized ? [normalized, `${normalized}[bot]`] : [normalized, bare];
+}
+function isAllowlistedLogin(login, allowlist) {
+    return expandAllowlistKeys(login).some((key) => allowlist.has(key));
+}
 function extractCoauthorLogins(message) {
     return [...message.matchAll(COAUTHOR_PATTERN)].map((match) => (0, githubLogin_1.normalizeGitHubLogin)(match[1] ?? ''));
 }
 function resolveContributorsFromSnapshot(pullRequest, commits, config) {
-    const allowlist = new Set([...BUILT_IN_ALLOWLIST, ...config.contributors.allowlist].map(githubLogin_1.normalizeGitHubLogin));
+    const allowlist = new Set([...BUILT_IN_ALLOWLIST, ...config.contributors.allowlist].flatMap(expandAllowlistKeys));
     const contributors = new Map();
     const add = (login, source, authorIsBot) => {
         if (!login) {
@@ -633,7 +657,7 @@ function resolveContributorsFromSnapshot(pullRequest, commits, config) {
         if (config.contributors.excludeBots && contributor.isBot) {
             return;
         }
-        if (allowlist.has(contributor.githubLogin)) {
+        if (isAllowlistedLogin(contributor.githubLogin, allowlist)) {
             return;
         }
         contributors.set(contributor.githubLogin, contributors.get(contributor.githubLogin) ?? contributor);
@@ -695,7 +719,9 @@ function createContributor(login, source, authorIsBot) {
     return {
         githubLogin,
         source,
-        isBot: authorIsBot || githubLogin.endsWith('[bot]'),
+        // Prefer GitHub's user.type === 'Bot' when available; fall back to the [bot] login suffix
+        // used by Apps and by logins parsed from commit trailers (e.g. co-authors).
+        isBot: Boolean(authorIsBot) || githubLogin.endsWith('[bot]'),
     };
 }
 

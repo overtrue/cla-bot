@@ -5,7 +5,34 @@ import { normalizeGitHubLogin } from '../utils/githubLogin';
 
 const COAUTHOR_PATTERN =
   /Co-authored-by:\s*(?:.+?\s)?(?:\(@)?@([A-Za-z0-9-]+(?:\[bot\])?)/gi;
-const BUILT_IN_ALLOWLIST = ['cursoragent'] as const;
+const BUILT_IN_ALLOWLIST = [
+  'cursoragent',
+  'dependabot[bot]',
+  'github-actions[bot]',
+  'renovate[bot]',
+  'copilot',
+  'copilot-swe-agent[bot]',
+  'copilot-pull-request-reviewer[bot]',
+] as const;
+
+/** Expand a login into bare + `[bot]` forms for case-insensitive allowlist matching. */
+export function expandAllowlistKeys(login: string): string[] {
+  const normalized = normalizeGitHubLogin(login);
+  if (!normalized) {
+    return [];
+  }
+
+  const bare = normalized.endsWith('[bot]') ? normalized.slice(0, -'[bot]'.length) : normalized;
+  if (!bare) {
+    return [normalized];
+  }
+
+  return bare === normalized ? [normalized, `${normalized}[bot]`] : [normalized, bare];
+}
+
+function isAllowlistedLogin(login: string, allowlist: Set<string>): boolean {
+  return expandAllowlistKeys(login).some((key) => allowlist.has(key));
+}
 
 export function extractCoauthorLogins(message: string): string[] {
   return [...message.matchAll(COAUTHOR_PATTERN)].map((match) => normalizeGitHubLogin(match[1] ?? ''));
@@ -16,7 +43,9 @@ export function resolveContributorsFromSnapshot(
   commits: PullCommit[],
   config: ClaConfig,
 ): Contributor[] {
-  const allowlist = new Set([...BUILT_IN_ALLOWLIST, ...config.contributors.allowlist].map(normalizeGitHubLogin));
+  const allowlist = new Set(
+    [...BUILT_IN_ALLOWLIST, ...config.contributors.allowlist].flatMap(expandAllowlistKeys),
+  );
   const contributors = new Map<string, Contributor>();
 
   const add = (login: string | null, source: Contributor['source'], authorIsBot?: boolean): void => {
@@ -30,7 +59,7 @@ export function resolveContributorsFromSnapshot(
       return;
     }
 
-    if (allowlist.has(contributor.githubLogin)) {
+    if (isAllowlistedLogin(contributor.githubLogin, allowlist)) {
       return;
     }
 
